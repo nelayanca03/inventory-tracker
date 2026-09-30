@@ -10,7 +10,8 @@ import {
   Package, 
   Search,
   LogOut,
-  Users
+  Users,
+  Database
 } from 'lucide-react';
 import { InventoryItem, UserAccount } from '../types/inventory';
 import { exportInventoryToCsv, copyInventoryToClipboardTSV } from '../services/csvService';
@@ -22,6 +23,7 @@ interface NavbarProps {
   setActiveTab: (tab: 'user-count' | 'admin-master' | 'list' | 'logs') => void;
   items: InventoryItem[];
   onLogout: () => void;
+  onOpenStorageModal?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -29,7 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab, 
   setActiveTab, 
   items,
-  onLogout
+  onLogout,
+  onOpenStorageModal
 }) => {
   const [copied, setCopied] = React.useState(false);
 
@@ -149,6 +152,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Download className="w-3.5 h-3.5 text-slate-500" />
                 <span>Export CSV</span>
+              </button>
+            )}
+
+            {/* Storage Database Monitor Button */}
+            {isAdmin && onOpenStorageModal && (
+              <button
+                type="button"
+                onClick={onOpenStorageModal}
+                title="Cek sisa kuota dan status storage database Firebase"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-2xs"
+              >
+                <Database className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Storage DB</span>
               </button>
             )}
 

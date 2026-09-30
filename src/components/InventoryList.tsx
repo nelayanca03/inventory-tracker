@@ -17,7 +17,8 @@ import {
   X,
   FileSpreadsheet,
   Download,
-  Copy
+  Copy,
+  RotateCcw
 } from 'lucide-react';
 import { InventoryItem, FilterState, ViewMode } from '../types/inventory';
 import { exportInventoryToCsv, copyInventoryToClipboardTSV } from '../services/csvService';
@@ -28,8 +29,111 @@ interface InventoryListProps {
   onEdit: (item: InventoryItem) => void;
   onDelete: (id: string) => void;
   onQuickUpdateQty: (id: string, newQtyFisik: number) => void;
+  onResetAllQtyFisik?: () => void;
   onOpenPhotoLightbox: (item: InventoryItem) => void;
 }
+
+/**
+ * Interactive inline editor for Qty Fisik:
+ * - Minus button (-)
+ * - Direct editable number input
+ * - Plus button (+)
+ * - Quick reset (0)
+ */
+const InlineQtyEditor: React.FC<{
+  itemId: string;
+  qtyFisik: number;
+  onUpdate: (id: string, newQty: number) => void;
+}> = ({ itemId, qtyFisik, onUpdate }) => {
+  const [val, setVal] = React.useState<string>(qtyFisik.toString());
+  const [isEditing, setIsEditing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isEditing) {
+      setVal(qtyFisik.toString());
+    }
+  }, [qtyFisik, isEditing]);
+
+  const handleCommit = () => {
+    setIsEditing(false);
+    const parsed = parseInt(val, 10);
+    const safeQty = isNaN(parsed) ? 0 : Math.max(0, parsed);
+    setVal(safeQty.toString());
+    if (safeQty !== qtyFisik) {
+      onUpdate(itemId, safeQty);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setVal(qtyFisik.toString());
+    }
+  };
+
+  return (
+    <div className="inline-flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200 transition-colors shadow-2xs">
+      {/* Minus Button */}
+      <button
+        type="button"
+        onClick={() => {
+          const next = Math.max(0, qtyFisik - 1);
+          setVal(next.toString());
+          onUpdate(itemId, next);
+        }}
+        disabled={qtyFisik <= 0}
+        className="w-6 h-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-slate-700 font-black text-sm active:scale-95 transition-all shadow-2xs select-none"
+        title="Kurangi 1 fisik (-)"
+      >
+        -
+      </button>
+
+      {/* Direct Editable Number Input */}
+      <input
+        type="number"
+        min="0"
+        value={val}
+        onFocus={() => setIsEditing(true)}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={handleCommit}
+        onKeyDown={handleKeyDown}
+        className="w-14 text-center font-mono font-bold text-xs text-slate-900 bg-white border border-slate-200 rounded-lg py-1 px-1 focus:ring-2 focus:ring-slate-900 focus:outline-hidden shadow-2xs transition-all"
+        title="Ketik angka langsung atau klik tombol +/-"
+      />
+
+      {/* Plus Button */}
+      <button
+        type="button"
+        onClick={() => {
+          const next = qtyFisik + 1;
+          setVal(next.toString());
+          onUpdate(itemId, next);
+        }}
+        className="w-6 h-6 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 font-black text-sm active:scale-95 transition-all shadow-2xs select-none"
+        title="Tambah 1 fisik (+)"
+      >
+        +
+      </button>
+
+      {/* Quick 0 button if > 0 */}
+      {qtyFisik > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setVal('0');
+            onUpdate(itemId, 0);
+          }}
+          className="w-5 h-6 flex items-center justify-center rounded-md text-[10px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          title="Reset item ini ke 0"
+        >
+          0
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const InventoryList: React.FC<InventoryListProps> = ({
   items,
@@ -37,11 +141,13 @@ export const InventoryList: React.FC<InventoryListProps> = ({
   onEdit,
   onDelete,
   onQuickUpdateQty,
+  onResetAllQtyFisik,
   onOpenPhotoLightbox
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [copied, setCopied] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -269,6 +375,20 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                 <LayoutGrid className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Kosongkan Semua Qty Fisik Button */}
+            {onResetAllQtyFisik && (
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-[0.98]"
+                title="Kosongkan (reset ke 0) seluruh Qty Fisik hasil hitung"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden sm:inline">Kosongkan Semua Qty Fisik</span>
+                <span className="sm:hidden">Kosongkan Fisik</span>
+              </button>
+            )}
 
             <button
               onClick={onAddNew}
@@ -527,27 +647,13 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                       <span className="text-[10px] text-slate-400 font-sans">{item.satuan}</span>
                     </td>
 
-                    {/* Qty Fisik (With quick inline recount) */}
+                    {/* Qty Fisik (With interactive inline recount & editable input) */}
                     <td className="px-4 py-3 text-center font-mono">
-                      <div className="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                        <button
-                          onClick={() => onQuickUpdateQty(item.id, Math.max(0, item.qtyFisik - 1))}
-                          className="w-5 h-5 flex items-center justify-center rounded hover:bg-white text-slate-600 font-bold active:bg-slate-300"
-                          title="Kurangi 1 fisik"
-                        >
-                          -
-                        </button>
-                        <span className="w-10 text-center font-bold text-slate-900">
-                          {item.qtyFisik}
-                        </span>
-                        <button
-                          onClick={() => onQuickUpdateQty(item.id, item.qtyFisik + 1)}
-                          className="w-5 h-5 flex items-center justify-center rounded hover:bg-white text-slate-600 font-bold active:bg-slate-300"
-                          title="Tambah 1 fisik"
-                        >
-                          +
-                        </button>
-                      </div>
+                      <InlineQtyEditor
+                        itemId={item.id}
+                        qtyFisik={item.qtyFisik}
+                        onUpdate={onQuickUpdateQty}
+                      />
                     </td>
 
                     {/* Selisih */}
@@ -713,19 +819,12 @@ export const InventoryList: React.FC<InventoryListProps> = ({
 
               {/* Card Footer Actions */}
               <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 font-mono">
-                  <button
-                    onClick={() => onQuickUpdateQty(item.id, Math.max(0, item.qtyFisik - 1))}
-                    className="w-7 h-7 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-100 font-bold"
-                  >
-                    -
-                  </button>
-                  <button
-                    onClick={() => onQuickUpdateQty(item.id, item.qtyFisik + 1)}
-                    className="w-7 h-7 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-100 font-bold"
-                  >
-                    +
-                  </button>
+                <div>
+                  <InlineQtyEditor
+                    itemId={item.id}
+                    qtyFisik={item.qtyFisik}
+                    onUpdate={onQuickUpdateQty}
+                  />
                 </div>
 
                 <div className="flex items-center gap-1">
@@ -804,6 +903,55 @@ export const InventoryList: React.FC<InventoryListProps> = ({
                 className="w-1/2 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-xs"
               >
                 Ya, Hapus Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal to Reset All Physical Qty */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Kosongkan Semua Qty Fisik?</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Reset seluruh hasil hitung opname ke 0</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 space-y-2">
+              <p className="font-semibold">
+                Apakah Anda yakin ingin mengosongkan Qty Fisik untuk seluruh <strong>{items.length} barang</strong>?
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-rose-700">
+                <li>Seluruh Qty Fisik akan direset kembali menjadi <strong>0</strong>.</li>
+                <li>Status barang akan ditandai belum dihitung (0 / selisih minus penuh).</li>
+                <li>Data Master Barang, Nama, Kode, Lokasi, dan Qty Sistem tetap <strong>aman</strong> dan tidak akan hilang.</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onResetAllQtyFisik?.();
+                  setShowResetConfirm(false);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-colors shadow-xs flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Ya, Kosongkan Semua Qty Fisik</span>
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ import { AdminMasterManagement } from './components/AdminMasterManagement';
 import { InventoryList } from './components/InventoryList';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PhotoLightbox } from './components/PhotoLightbox';
+import { FirebaseStorageModal } from './components/FirebaseStorageModal';
 import { InventoryItem, AppSettings, UserAccount, InputLog } from './types/inventory';
 import { 
   getStoredItems, 
@@ -25,8 +26,8 @@ import {
   saveCloudLog,
   clearCloudLogs
 } from './services/firebase';
-import { getCurrentSession, logoutUser } from './services/authService';
-import { CheckCircle2, Cloud } from 'lucide-react';
+import { getCurrentSession, logoutUser, getAllUsers } from './services/authService';
+import { CheckCircle2, Cloud, Database } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(getCurrentSession());
@@ -37,6 +38,7 @@ export default function App() {
   
   const [lightboxItem, setLightboxItem] = useState<InventoryItem | null>(null);
   const [editingMasterItem, setEditingMasterItem] = useState<InventoryItem | null>(null);
+  const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
 
@@ -268,6 +270,7 @@ export default function App() {
         setActiveTab={setActiveTab} 
         items={items} 
         onLogout={handleLogout}
+        onOpenStorageModal={() => setIsStorageModalOpen(true)}
       />
 
       {/* Main Content Viewport */}
@@ -315,6 +318,7 @@ export default function App() {
                 onUpdateLocations={handleUpdateLocations}
                 onOpenPhotoLightbox={(item) => setLightboxItem(item)}
                 onSwitchToUser={() => setActiveTab('user-count')}
+                onOpenStorageModal={() => setIsStorageModalOpen(true)}
               />
             )}
 
@@ -377,11 +381,35 @@ export default function App() {
         onClose={() => setLightboxItem(null)}
       />
 
+      {/* Firebase Database Storage Monitor Modal */}
+      <FirebaseStorageModal
+        isOpen={isStorageModalOpen}
+        onClose={() => setIsStorageModalOpen(false)}
+        items={items}
+        logs={logs}
+        users={getAllUsers()}
+        settings={settings}
+        onClearLogs={handleClearLogs}
+      />
+
       {/* Quiet Footer */}
       <footer className="border-t border-slate-200 bg-white py-6 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-800">InvenTrack</span>
+            {isAdmin && (
+              <>
+                <span aria-hidden="true" className="text-slate-300">·</span>
+                <button
+                  type="button"
+                  onClick={() => setIsStorageModalOpen(true)}
+                  className="text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1 font-medium"
+                >
+                  <Database className="w-3 h-3 text-indigo-500" />
+                  <span>Kapasitas Storage DB</span>
+                </button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
