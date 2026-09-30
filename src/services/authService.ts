@@ -217,6 +217,60 @@ export function deleteUserByAdmin(userId: string): boolean {
   return true;
 }
 
+/**
+ * Admin directly creates active user accounts for warehouse operators
+ */
+export function createUserByAdmin(data: {
+  username: string;
+  fullName: string;
+  email?: string;
+  password: string;
+  role?: 'admin' | 'user';
+  adminName: string;
+}): { success: boolean; message: string; user?: UserAccount } {
+  const users = getAllUsers();
+  const cleanUsername = data.username.trim().toLowerCase();
+  const cleanEmail = (data.email || `${cleanUsername}@inventrack.local`).trim().toLowerCase();
+
+  if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
+    return { success: false, message: 'Username sudah digunakan oleh akun lain.' };
+  }
+
+  const newUser: UserAccount = {
+    id: 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    username: data.username.trim(),
+    email: cleanEmail,
+    fullName: data.fullName.trim(),
+    password: data.password,
+    role: data.role || 'user',
+    status: 'active', // Instantly active & ready to login
+    createdAt: new Date().toISOString(),
+    verifiedAt: new Date().toISOString(),
+    verifiedBy: data.adminName
+  };
+
+  users.push(newUser);
+  saveAllUsers(users);
+  saveCloudUser(newUser).catch(console.error);
+
+  return {
+    success: true,
+    message: `Akun "${newUser.fullName}" (@${newUser.username}) berhasil dibuat dan langsung aktif.`,
+    user: newUser
+  };
+}
+
+export function updateUserPasswordByAdmin(userId: string, newPassword: string): boolean {
+  const users = getAllUsers();
+  const target = users.find(u => u.id === userId);
+  if (!target) return false;
+
+  target.password = newPassword;
+  saveAllUsers(users);
+  saveCloudUser(target).catch(console.error);
+  return true;
+}
+
 export function logoutUser(): void {
   setCurrentSession(null);
 }

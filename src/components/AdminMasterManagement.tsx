@@ -723,7 +723,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
           }`}
         >
           <Users className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Verifikasi User</span>
+          <span>Kelola Akun Operator</span>
           {pendingUsersCount > 0 && (
             <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-bold animate-pulse">
               {pendingUsersCount}
