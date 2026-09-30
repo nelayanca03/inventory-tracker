@@ -1,0 +1,7 @@
+{
+  "name": "InvenTrack - Web Input Inventory & Stock Opname",
+  "description": "Aplikasi web modern untuk penginputan perhitungan inventory manual dengan input lapang, foto barang, filter pencarian lokasi rak/tempat, dan ekspor instan ke spreadsheet CSV.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

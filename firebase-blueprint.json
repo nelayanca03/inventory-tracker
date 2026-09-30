@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "inventoryItem": {
+      "title": "Inventory Item",
+      "description": "Represents an inventory item master, stock opname physical count, and photo reference",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "no": { "type": "number" },
+        "kodeStok": { "type": "string" },
+        "namaStok": { "type": "string" },
+        "namaTempat": { "type": "string" },
+        "kategori": { "type": "string" },
+        "subKategori": { "type": "string" },
+        "qtySistem": { "type": "number" },
+        "qtyFisik": { "type": "number" },
+        "selisih": { "type": "number" },
+        "opnameValue": { "type": "number" },
+        "satuan": { "type": "string" },
+        "kondisi": { "type": "string" },
+        "gambarUrl": { "type": "string" },
+        "petugas": { "type": "string" },
+        "catatan": { "type": "string" },
+        "isCounted": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "kodeStok", "namaStok"]
+    },
+    "appSettings": {
+      "title": "App Settings",
+      "description": "Global warehouse configuration and available racks list",
+      "type": "object",
+      "properties": {
+        "availableLocations": { "type": "array" },
+        "defaultTempat": { "type": "string" },
+        "defaultSatuan": { "type": "string" },
+        "defaultPetugas": { "type": "string" },
+        "googleSheetsWebhookUrl": { "type": "string" },
+        "autoSyncWebhook": { "type": "boolean" }
+      }
+    },
+    "userAccount": {
+      "title": "User Account",
+      "description": "User profile with role and admin verification status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "approvedBy": { "type": "string" }
+      },
+      "required": ["id", "username", "fullName", "role", "status"]
+    }
+  },
+  "firestore": {
+    "/inventory_items/{itemId}": {
+      "schema": { "$ref": "#/entities/inventoryItem" },
+      "description": "Real-time inventory catalog and physical counts across all devices"
+    },
+    "/app_settings/{settingsId}": {
+      "schema": { "$ref": "#/entities/appSettings" },
+      "description": "Synchronized warehouse settings and location rack list"
+    },
+    "/user_accounts/{userId}": {
+      "schema": { "$ref": "#/entities/userAccount" },
+      "description": "User profiles and verification statuses"
+    }
+  }
+}
