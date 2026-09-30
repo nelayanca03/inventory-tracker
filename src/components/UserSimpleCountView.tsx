@@ -164,7 +164,7 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                 autoFocus
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Ketik nama barang... (Contoh: Bearing, Scanner, Kardus)"
+                placeholder="Cari nama barang..."
                 className="w-full pl-12 pr-4 py-3.5 text-base border-2 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-0 outline-none transition-all placeholder:text-slate-400"
               />
               {searchTerm && (
@@ -450,7 +450,7 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                     setLokasi(e.target.value);
                     if (locationError) setLocationError(null);
                   }}
-                  placeholder="Pilih dari tombol di bawah atau ketik nama rak..."
+                  placeholder="Pilih atau ketik lokasi..."
                   className={`w-full px-4 py-3 text-sm border rounded-xl focus:ring-1 outline-none transition-colors ${
                     locationError 
                       ? 'border-rose-400 bg-rose-50/30 focus:border-rose-600 focus:ring-rose-600' 
@@ -491,13 +491,12 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
             {/* Catatan Tambahan (Opsional) */}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Catatan Kondisi Fisik (Opsional)
+                Catatan (Opsional)
               </label>
               <input
                 type="text"
                 value={catatan}
                 onChange={(e) => setCatatan(e.target.value)}
-                placeholder="Contoh: Kemasan agak penyok, label barcode jelas, dll."
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-slate-900 outline-none"
               />
             </div>

@@ -617,7 +617,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
         (filterPhoto === 'no_photo' && !item.gambarUrl);
 
       return matchSearch && matchLocation && matchCategory && matchPhoto;
-    });
+    }).sort((a, b) => a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' }));
   }, [items, searchQuery, filterLocation, filterCategory, filterPhoto]);
 
   // Selection handlers
@@ -815,7 +815,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama barang atau kode stok..."
+                  placeholder="Cari master barang..."
                   className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:border-slate-900 outline-none bg-slate-50 focus:bg-white transition-colors"
                 />
                 {searchQuery && (
@@ -1558,7 +1558,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                       handleAddSingleLocation();
                     }
                   }}
-                  placeholder="Ketik nama lokasi / rak baru (Contoh: Gudang B - Rak 04)"
+                  placeholder="Nama lokasi / lantai baru..."
                   className="w-full pl-9 pr-3.5 py-2.5 text-xs border border-slate-300 rounded-xl focus:border-slate-900 outline-none"
                 />
               </div>
@@ -1590,7 +1590,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                   type="text"
                   value={locationSearchQuery}
                   onChange={(e) => setLocationSearchQuery(e.target.value)}
-                  placeholder="Filter nama lokasi..."
+                  placeholder="Cari lokasi..."
                   className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:border-slate-900 outline-none bg-slate-50 focus:bg-white"
                 />
                 {locationSearchQuery && (
@@ -1768,7 +1768,6 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                       type="text"
                       value={kodeStok}
                       onChange={(e) => setKodeStok(e.target.value)}
-                      placeholder="Contoh: SP-BRG-6204"
                       className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-xl focus:border-slate-900 uppercase outline-none"
                       required
                     />
@@ -1783,7 +1782,6 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                         type="text"
                         value={kategori}
                         onChange={(e) => setKategori(e.target.value)}
-                        placeholder="Sparepart / Umum"
                         className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none"
                       />
                     </div>
@@ -1796,7 +1794,6 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                         type="text"
                         value={subKategori}
                         onChange={(e) => setSubKategori(e.target.value)}
-                        placeholder="Mechanical"
                         className="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none"
                       />
                     </div>
@@ -1840,7 +1837,6 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                         min="0"
                         value={opnameValue}
                         onChange={(e) => setOpnameValue(parseFloat(e.target.value) || 0)}
-                        placeholder="0"
                         className="w-full px-3 py-2 text-xs font-mono border border-slate-300 rounded-xl outline-none"
                       />
                     </div>
@@ -2022,7 +2018,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                             type="url"
                             value={inputImageUrl}
                             onChange={(e) => setInputImageUrl(e.target.value)}
-                            placeholder="Atau tempel link URL gambar web (https://...)"
+                            placeholder="https://"
                             className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-xl outline-none bg-white placeholder:text-slate-400"
                           />
                           <button
@@ -2297,7 +2293,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                   type="url"
                   value={inputUrlQuickPhoto}
                   onChange={(e) => setInputUrlQuickPhoto(e.target.value)}
-                  placeholder="Tempel link URL gambar web (https://...)"
+                  placeholder="https://"
                   className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-xl outline-none"
                 />
                 <button

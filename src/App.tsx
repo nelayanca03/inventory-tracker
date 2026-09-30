@@ -382,10 +382,6 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-800">InvenTrack</span>
-            <span aria-hidden="true">·</span>
-            <span>Cloud Database Terpusat & Sinkronisasi Multi-Device</span>
-            <span aria-hidden="true">·</span>
-            <span className="text-slate-400">Audit Trail Aktif</span>
           </div>
 
           <div className="flex items-center gap-4">

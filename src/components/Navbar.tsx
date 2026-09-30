@@ -74,14 +74,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Zone 2: Navigation Links (Strictly partitioned by role) */}
           <nav className="hidden md:flex items-center gap-1 text-sm font-medium text-slate-600">
             {!isAdmin ? (
-              /* USER NAVIGATION: ONLY ALLOWED TO INPUT (NO RECAP SIGHT) */
+              /* USER NAVIGATION: ONLY ALLOWED TO INPUT */
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 font-semibold text-xs flex items-center gap-1.5 border border-emerald-200">
                   <Search className="w-3.5 h-3.5 text-emerald-600" />
                   Mode Input Stok Lapangan
-                </span>
-                <span className="text-xs text-slate-400">
-                  (Akses dibatasi: Hanya diperbolehkan mencari & menginput stok fisik)
                 </span>
               </div>
             ) : (

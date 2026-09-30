@@ -49,8 +49,8 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     kategori: 'all',
     statusSelisih: 'all',
     kondisi: 'all',
-    sortBy: 'updatedAt',
-    sortOrder: 'desc'
+    sortBy: 'namaStok',
+    sortOrder: 'asc'
   });
 
   // Extract distinct locations and categories
@@ -64,7 +64,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     return Array.from(new Set(list)).sort();
   }, [items]);
 
-  // Filtered and sorted items
+  // Filtered and sorted items - always stable A to Z by default
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       // Search text
@@ -99,16 +99,28 @@ export const InventoryList: React.FC<InventoryListProps> = ({
       return true;
     }).sort((a, b) => {
       let comparison = 0;
-      if (filters.sortBy === 'kodeStok') {
-        comparison = a.kodeStok.localeCompare(b.kodeStok);
-      } else if (filters.sortBy === 'namaStok') {
-        comparison = a.namaStok.localeCompare(b.namaStok);
+      if (filters.sortBy === 'namaStok') {
+        comparison = a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' });
+        if (comparison === 0) {
+          comparison = a.kodeStok.localeCompare(b.kodeStok, 'id', { numeric: true, sensitivity: 'base' });
+        }
+      } else if (filters.sortBy === 'kodeStok') {
+        comparison = a.kodeStok.localeCompare(b.kodeStok, 'id', { numeric: true, sensitivity: 'base' });
+        if (comparison === 0) {
+          comparison = a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' });
+        }
       } else if (filters.sortBy === 'namaTempat') {
-        comparison = a.namaTempat.localeCompare(b.namaTempat);
+        comparison = (a.namaTempat || '').localeCompare(b.namaTempat || '', 'id', { numeric: true });
+        if (comparison === 0) {
+          comparison = a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' });
+        }
       } else if (filters.sortBy === 'selisih') {
         comparison = Math.abs(b.selisih) - Math.abs(a.selisih);
+        if (comparison === 0) {
+          comparison = a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' });
+        }
       } else {
-        comparison = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        comparison = a.namaStok.localeCompare(b.namaStok, 'id', { numeric: true, sensitivity: 'base' });
       }
       return filters.sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -141,12 +153,20 @@ export const InventoryList: React.FC<InventoryListProps> = ({
       kategori: 'all',
       statusSelisih: 'all',
       kondisi: 'all',
-      sortBy: 'updatedAt',
-      sortOrder: 'desc'
+      sortBy: 'namaStok',
+      sortOrder: 'asc'
     });
   };
 
-  const hasActiveFilters = filters.searchTerm !== '' || filters.tempat !== 'all' || filters.kategori !== 'all' || filters.statusSelisih !== 'all' || filters.kondisi !== 'all';
+  const handleSortToggle = (column: 'kodeStok' | 'namaStok' | 'namaTempat' | 'selisih') => {
+    setFilters(prev => ({
+      ...prev,
+      sortBy: column,
+      sortOrder: prev.sortBy === column && prev.sortOrder === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const hasActiveFilters = filters.searchTerm !== '' || filters.tempat !== 'all' || filters.kategori !== 'all' || filters.statusSelisih !== 'all' || filters.kondisi !== 'all' || filters.sortBy !== 'namaStok' || filters.sortOrder !== 'asc';
 
   return (
     <div className="space-y-6">
@@ -213,7 +233,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
               type="text"
               value={filters.searchTerm}
               onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-              placeholder="Cari Kode Stok, Nama Stok, Nama Tempat/Rak, atau Catatan..."
+              placeholder="Cari data opname..."
               className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all placeholder:text-slate-400"
             />
             {filters.searchTerm && (
@@ -309,6 +329,25 @@ export const InventoryList: React.FC<InventoryListProps> = ({
             </div>
           )}
 
+          {/* Urutan / Sort Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={`${filters.sortBy}-${filters.sortOrder}`}
+              onChange={(e) => {
+                const [sb, so] = e.target.value.split('-') as [FilterState['sortBy'], FilterState['sortOrder']];
+                setFilters(prev => ({ ...prev, sortBy: sb, sortOrder: so }));
+              }}
+              className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:ring-1 focus:ring-slate-900 focus:bg-white"
+            >
+              <option value="namaStok-asc">Urutkan: Nama Barang (A - Z)</option>
+              <option value="namaStok-desc">Urutkan: Nama Barang (Z - A)</option>
+              <option value="kodeStok-asc">Urutkan: Kode Stok (A - Z)</option>
+              <option value="namaTempat-asc">Urutkan: Lokasi / Rak</option>
+              <option value="selisih-desc">Urutkan: Selisih Terbesar</option>
+            </select>
+          </div>
+
           {/* Reset Filters button */}
           {hasActiveFilters && (
             <button
@@ -363,12 +402,60 @@ export const InventoryList: React.FC<InventoryListProps> = ({
               <thead className="bg-slate-50/80 text-slate-700 font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="px-4 py-3.5 w-12 text-center">Foto</th>
-                  <th className="px-4 py-3.5">Kode Stok</th>
-                  <th className="px-4 py-3.5">Nama Stok & Kategori</th>
-                  <th className="px-4 py-3.5">Tempat / Lokasi</th>
+                  <th 
+                    onClick={() => handleSortToggle('kodeStok')}
+                    className="px-4 py-3.5 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                    title="Klik untuk urutkan berdasarkan Kode Stok"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Kode Stok</span>
+                      {filters.sortBy === 'kodeStok' && (
+                        <span className="text-slate-900 font-bold">{filters.sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSortToggle('namaStok')}
+                    className="px-4 py-3.5 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                    title="Klik untuk urutkan Nama Barang A-Z"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Nama Stok & Kategori</span>
+                      {filters.sortBy === 'namaStok' ? (
+                        <span className="text-emerald-800 font-bold bg-emerald-100 px-1.5 py-0.5 rounded text-[10px]">
+                          {filters.sortOrder === 'asc' ? 'A → Z ↑' : 'Z → A ↓'}
+                        </span>
+                      ) : (
+                        <ArrowUpDown className="w-3 h-3 text-slate-400" />
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSortToggle('namaTempat')}
+                    className="px-4 py-3.5 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                    title="Klik untuk urutkan berdasarkan Tempat / Lokasi"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Tempat / Lokasi</span>
+                      {filters.sortBy === 'namaTempat' && (
+                        <span className="text-slate-900 font-bold">{filters.sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
                   <th className="px-4 py-3.5 text-right font-mono">Qty Sistem</th>
                   <th className="px-4 py-3.5 text-center font-mono">Qty Fisik</th>
-                  <th className="px-4 py-3.5 text-right font-mono">Selisih</th>
+                  <th 
+                    onClick={() => handleSortToggle('selisih')}
+                    className="px-4 py-3.5 text-right font-mono cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                    title="Klik untuk urutkan berdasarkan Selisih"
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Selisih</span>
+                      {filters.sortBy === 'selisih' && (
+                        <span className="text-slate-900 font-bold">{filters.sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                  </th>
                   <th className="px-4 py-3.5">Petugas & Update</th>
                   <th className="px-4 py-3.5 text-right">Aksi</th>
                 </tr>

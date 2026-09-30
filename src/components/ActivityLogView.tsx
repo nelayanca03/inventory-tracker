@@ -266,7 +266,7 @@ export const ActivityLogView: React.FC<ActivityLogViewProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari kode stok, nama barang, nama operator, atau catatan..."
+              placeholder="Cari riwayat penginputan..."
               className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white"
             />
           </div>

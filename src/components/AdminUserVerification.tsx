@@ -222,7 +222,6 @@ export const AdminUserVerification: React.FC<AdminUserVerificationProps> = ({
                 required
                 value={newFullName}
                 onChange={(e) => setNewFullName(e.target.value)}
-                placeholder="misal: Dewi Lestari"
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 focus:ring-1 focus:ring-slate-900 focus:outline-none"
               />
             </div>
@@ -236,7 +235,6 @@ export const AdminUserVerification: React.FC<AdminUserVerificationProps> = ({
                 required
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))}
-                placeholder="misal: dewi"
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 font-mono focus:ring-1 focus:ring-slate-900 focus:outline-none"
               />
             </div>
@@ -250,7 +248,6 @@ export const AdminUserVerification: React.FC<AdminUserVerificationProps> = ({
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="misal: dewi123"
                 className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 font-mono focus:ring-1 focus:ring-slate-900 focus:outline-none"
               />
             </div>
@@ -410,7 +407,6 @@ export const AdminUserVerification: React.FC<AdminUserVerificationProps> = ({
                             type="text"
                             value={changePasswordValue}
                             onChange={(e) => setChangePasswordValue(e.target.value)}
-                            placeholder="Sandi baru..."
                             className="w-28 px-2 py-1 text-xs border border-slate-300 rounded font-mono focus:outline-none focus:ring-1 focus:ring-slate-900"
                           />
                           <button
