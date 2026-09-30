@@ -4,6 +4,9 @@ service cloud.firestore {
     match /inventory_items/{itemId} {
       allow read, write: if true;
     }
+    match /activity_logs/{logId} {
+      allow read, write: if true;
+    }
     match /app_settings/{settingsId} {
       allow read, write: if true;
     }

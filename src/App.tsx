@@ -4,10 +4,9 @@ import { AuthScreen } from './components/AuthScreen';
 import { UserSimpleCountView } from './components/UserSimpleCountView';
 import { AdminMasterManagement } from './components/AdminMasterManagement';
 import { InventoryList } from './components/InventoryList';
-import { BlueprintView } from './components/BlueprintView';
-import { SettingsAndSyncModal } from './components/SettingsAndSyncModal';
+import { ActivityLogView } from './components/ActivityLogView';
 import { PhotoLightbox } from './components/PhotoLightbox';
-import { InventoryItem, AppSettings, UserAccount } from './types/inventory';
+import { InventoryItem, AppSettings, UserAccount, InputLog } from './types/inventory';
 import { 
   getStoredItems, 
   saveStoredItems, 
@@ -21,7 +20,10 @@ import {
   deleteCloudInventoryItem, 
   batchSaveCloudInventory,
   subscribeToCloudSettings,
-  saveCloudSettings
+  saveCloudSettings,
+  subscribeToCloudLogs,
+  saveCloudLog,
+  clearCloudLogs
 } from './services/firebase';
 import { getCurrentSession, logoutUser } from './services/authService';
 import { CheckCircle2, Cloud } from 'lucide-react';
@@ -29,8 +31,9 @@ import { CheckCircle2, Cloud } from 'lucide-react';
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(getCurrentSession());
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [logs, setLogs] = useState<InputLog[]>([]);
   const [settings, setSettings] = useState<AppSettings>(getStoredSettings());
-  const [activeTab, setActiveTab] = useState<'user-count' | 'admin-master' | 'list' | 'blueprint' | 'settings'>('user-count');
+  const [activeTab, setActiveTab] = useState<'user-count' | 'admin-master' | 'list' | 'logs'>('user-count');
   
   const [lightboxItem, setLightboxItem] = useState<InventoryItem | null>(null);
   const [editingMasterItem, setEditingMasterItem] = useState<InventoryItem | null>(null);
@@ -66,9 +69,15 @@ export default function App() {
       saveStoredSettings(cloudSettings);
     });
 
+    // 3. Subscribe to real-time input activity logs
+    const unsubscribeLogs = subscribeToCloudLogs((cloudLogs) => {
+      setLogs(cloudLogs);
+    });
+
     return () => {
       unsubscribeItems();
       unsubscribeSettings();
+      unsubscribeLogs();
     };
   }, []);
 
@@ -105,8 +114,34 @@ export default function App() {
     showToast('Anda telah keluar dari aplikasi.');
   };
 
-  // Handlers for inventory items with real-time cloud sync
+  // Helper to record input activity logs
+  const recordInputLog = (
+    item: InventoryItem,
+    qtySebelum: number,
+    actionType: 'input_fisik' | 'quick_adjust' | 'tambah_barang' | 'edit_master'
+  ) => {
+    const newLog: InputLog = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      itemId: item.id,
+      kodeStok: item.kodeStok,
+      namaStok: item.namaStok,
+      namaTempat: item.namaTempat || 'Tidak Ditentukan',
+      qtySebelum: qtySebelum,
+      qtyFisik: item.qtyFisik,
+      selisih: item.selisih,
+      satuan: item.satuan,
+      petugas: item.petugas || currentUser?.fullName || 'Petugas',
+      petugasUsername: currentUser?.username,
+      catatan: item.catatan || '',
+      actionType: actionType,
+      timestamp: new Date().toISOString()
+    };
+    saveCloudLog(newLog).catch(console.error);
+  };
+
+  // Handlers for inventory items with real-time cloud sync & logging
   const handleSaveItem = async (item: InventoryItem) => {
+    const existing = items.find(i => i.id === item.id);
     const index = items.findIndex(i => i.id === item.id);
     let updated: InventoryItem[];
 
@@ -114,9 +149,13 @@ export default function App() {
       updated = [...items];
       updated[index] = item;
       showToast(`Data "${item.namaStok}" berhasil disimpan.`);
+      // Record audit log if counted or modified
+      const qtySebelum = existing ? existing.qtyFisik : 0;
+      recordInputLog(item, qtySebelum, 'input_fisik');
     } else {
       updated = [item, ...items];
       showToast(`Barang master "${item.namaStok}" berhasil ditambahkan.`);
+      recordInputLog(item, 0, 'tambah_barang');
     }
 
     updateItems(updated);
@@ -159,6 +198,7 @@ export default function App() {
   const handleQuickUpdateQty = (id: string, newQtyFisik: number) => {
     const target = items.find(i => i.id === id);
     if (!target) return;
+    const qtySebelum = target.qtyFisik;
     const qtyFisik = Math.max(0, newQtyFisik);
     const updatedItem: InventoryItem = {
       ...target,
@@ -197,6 +237,12 @@ export default function App() {
     batchSaveCloudInventory(newItems, replace).catch(console.error);
     setActiveTab('admin-master');
     showToast(`Berhasil menambahkan ${newItems.length} produk dari file CSV.`);
+  };
+
+  const handleClearLogs = () => {
+    clearCloudLogs().catch(console.error);
+    setLogs([]);
+    showToast('Seluruh riwayat log penginputan telah dibersihkan.');
   };
 
   const handleResetToDemo = () => {
@@ -312,19 +358,12 @@ export default function App() {
               />
             )}
 
-            {/* Tab: Blueprint Dokumen & Arsitektur */}
-            {activeTab === 'blueprint' && (
-              <BlueprintView />
-            )}
-
-            {/* Tab: Pengaturan & Spreadsheet Sync */}
-            {activeTab === 'settings' && (
-              <SettingsAndSyncModal
-                settings={settings}
-                onSaveSettings={handleSaveSettings}
-                items={items}
-                onImportItems={handleImportItems}
-                onClearAll={handleResetToDemo}
+            {/* Tab: Log Riwayat Penginputan Stok */}
+            {activeTab === 'logs' && (
+              <ActivityLogView
+                logs={logs}
+                currentUser={currentUser}
+                onClearLogs={handleClearLogs}
               />
             )}
           </>
@@ -344,28 +383,19 @@ export default function App() {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-800">InvenTrack</span>
             <span aria-hidden="true">·</span>
-            <span>Autentikasi Terverifikasi & Manajemen Master CSV</span>
+            <span>Cloud Database Terpusat & Sinkronisasi Multi-Device</span>
             <span aria-hidden="true">·</span>
-            <span className="text-slate-400">Siap Vercel & Spreadsheet Database</span>
+            <span className="text-slate-400">Audit Trail Aktif</span>
           </div>
 
           <div className="flex items-center gap-4">
             {isAdmin ? (
-              <>
-                <button
-                  onClick={() => setActiveTab('blueprint')}
-                  className="text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  Blueprint Sistem
-                </button>
-                <span aria-hidden="true">·</span>
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className="text-slate-600 hover:text-slate-900 transition-colors"
-                >
-                  CSV Spreadsheet
-                </button>
-              </>
+              <button
+                onClick={() => setActiveTab('logs')}
+                className="text-slate-600 hover:text-slate-900 font-medium transition-colors"
+              >
+                Log Penginputan ({logs.length})
+              </button>
             ) : (
               <span className="text-emerald-700 font-medium">
                 Masuk sebagai: {currentUser.fullName}

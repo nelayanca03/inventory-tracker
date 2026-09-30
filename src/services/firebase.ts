@@ -10,7 +10,7 @@ import {
   writeBatch,
   getDocs
 } from 'firebase/firestore';
-import { InventoryItem, AppSettings, UserAccount } from '../types/inventory';
+import { InventoryItem, AppSettings, UserAccount, InputLog } from '../types/inventory';
 import { DEFAULT_SETTINGS } from './storageService';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -38,6 +38,7 @@ const ITEMS_COLLECTION = 'inventory_items';
 const SETTINGS_COLLECTION = 'app_settings';
 const SETTINGS_DOC_ID = 'global_config';
 const USERS_COLLECTION = 'user_accounts';
+const LOGS_COLLECTION = 'activity_logs';
 
 /**
  * Real-time subscription to inventory items across all devices
@@ -177,3 +178,42 @@ export async function deleteCloudUser(userId: string): Promise<void> {
   const docRef = doc(db, USERS_COLLECTION, userId);
   await deleteDoc(docRef);
 }
+
+/**
+ * Real-time subscription to input activity logs
+ */
+export function subscribeToCloudLogs(
+  onUpdate: (logs: InputLog[]) => void
+): () => void {
+  const colRef = collection(db, LOGS_COLLECTION);
+  return onSnapshot(colRef, (snapshot) => {
+    const logs: InputLog[] = [];
+    snapshot.forEach((docSnap) => {
+      logs.push(docSnap.data() as InputLog);
+    });
+    // Sort descending by timestamp (newest first)
+    logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    onUpdate(logs);
+  });
+}
+
+/**
+ * Save new input log to Cloud Firestore
+ */
+export async function saveCloudLog(log: InputLog): Promise<void> {
+  const docRef = doc(db, LOGS_COLLECTION, log.id);
+  await setDoc(docRef, log);
+}
+
+/**
+ * Clear all activity logs
+ */
+export async function clearCloudLogs(): Promise<void> {
+  const existingSnap = await getDocs(collection(db, LOGS_COLLECTION));
+  const deleteBatch = writeBatch(db);
+  existingSnap.docs.forEach((d) => {
+    deleteBatch.delete(d.ref);
+  });
+  await deleteBatch.commit();
+}
+

@@ -27,6 +27,28 @@
       },
       "required": ["id", "kodeStok", "namaStok"]
     },
+    "inputLog": {
+      "title": "Input Log",
+      "description": "Historical audit log of stock opname physical counts and inputs with exact timestamps",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "kodeStok": { "type": "string" },
+        "namaStok": { "type": "string" },
+        "namaTempat": { "type": "string" },
+        "qtySebelum": { "type": "number" },
+        "qtyFisik": { "type": "number" },
+        "selisih": { "type": "number" },
+        "satuan": { "type": "string" },
+        "petugas": { "type": "string" },
+        "petugasUsername": { "type": "string" },
+        "catatan": { "type": "string" },
+        "actionType": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "itemId", "kodeStok", "namaStok", "qtyFisik", "petugas", "timestamp"]
+    },
     "appSettings": {
       "title": "App Settings",
       "description": "Global warehouse configuration and available racks list",
@@ -62,6 +84,10 @@
     "/inventory_items/{itemId}": {
       "schema": { "$ref": "#/entities/inventoryItem" },
       "description": "Real-time inventory catalog and physical counts across all devices"
+    },
+    "/activity_logs/{logId}": {
+      "schema": { "$ref": "#/entities/inputLog" },
+      "description": "Audit trail log of all inventory count inputs with timestamps and operators"
     },
     "/app_settings/{settingsId}": {
       "schema": { "$ref": "#/entities/appSettings" },

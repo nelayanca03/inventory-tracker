@@ -1,8 +1,7 @@
 import React from 'react';
 import { 
   FileSpreadsheet, 
-  Layers, 
-  SlidersHorizontal, 
+  Clock, 
   Download, 
   Copy,
   Check, 
@@ -19,8 +18,8 @@ import { getAllUsers } from '../services/authService';
 
 interface NavbarProps {
   currentUser: UserAccount;
-  activeTab: 'user-count' | 'admin-master' | 'list' | 'blueprint' | 'settings';
-  setActiveTab: (tab: 'user-count' | 'admin-master' | 'list' | 'blueprint' | 'settings') => void;
+  activeTab: 'user-count' | 'admin-master' | 'list' | 'logs';
+  setActiveTab: (tab: 'user-count' | 'admin-master' | 'list' | 'logs') => void;
   items: InventoryItem[];
   onLogout: () => void;
 }
@@ -118,27 +117,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('blueprint')}
+                  onClick={() => setActiveTab('logs')}
                   className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-                    activeTab === 'blueprint'
+                    activeTab === 'logs'
                       ? 'bg-slate-100 text-slate-900 font-semibold'
                       : 'hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
-                  <Layers className="w-4 h-4 text-indigo-600" />
-                  Blueprint Sistem
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-                    activeTab === 'settings'
-                      ? 'bg-slate-100 text-slate-900 font-semibold'
-                      : 'hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <SlidersHorizontal className="w-4 h-4 text-slate-500" />
-                  Spreadsheet & Sync
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  Log Penginputan
                 </button>
               </>
             )}

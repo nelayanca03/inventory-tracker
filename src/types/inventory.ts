@@ -57,3 +57,21 @@ export interface AppSettings {
   defaultSatuan: string;
   availableLocations: string[];
 }
+
+export interface InputLog {
+  id: string;
+  itemId: string;
+  kodeStok: string;
+  namaStok: string;
+  namaTempat: string;
+  qtySebelum: number;
+  qtyFisik: number;
+  selisih: number;
+  satuan: string;
+  petugas: string;
+  petugasUsername?: string;
+  catatan?: string;
+  actionType: 'input_fisik' | 'quick_adjust' | 'tambah_barang' | 'edit_master';
+  timestamp: string;
+}
+
