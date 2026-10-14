@@ -14,10 +14,12 @@ import {
   Loader2,
   X,
   Camera,
-  Mic
+  Mic,
+  BrainCircuit
 } from 'lucide-react';
 import { InventoryItem, AppSettings, UserAccount } from '../types/inventory';
 import { AISmartInputModal } from './AISmartInputModal';
+import { customMlEngine } from '../services/customMlEngine';
 
 interface UserSimpleCountViewProps {
   currentUser: UserAccount;
@@ -25,6 +27,7 @@ interface UserSimpleCountViewProps {
   settings: AppSettings;
   onSaveCount: (updatedItem: InventoryItem, mode?: 'replace' | 'accumulate', addedQty?: number) => void;
   onOpenPhotoLightbox: (item: InventoryItem) => void;
+  onOpenMlStudio?: () => void;
 }
 
 export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
@@ -32,9 +35,11 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
   items,
   settings,
   onSaveCount,
-  onOpenPhotoLightbox
+  onOpenPhotoLightbox,
+  onOpenMlStudio
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [lastInputQuery, setLastInputQuery] = useState('');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   
   // Count input states
@@ -55,6 +60,7 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     setLokasi(loc || item.namaTempat || '');
     setLocationError(null);
     setCatatan(cat || item.catatan || '');
+    setLastInputQuery(searchTerm);
     setSearchTerm('');
   };
 
@@ -88,6 +94,12 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     ).slice(0, 10);
   }, [items, searchTerm]);
 
+  // Real-time In-App Machine Learning Prediction for loose queries, abbreviations & slangs
+  const mlPrediction = useMemo(() => {
+    if (!searchTerm.trim() || searchTerm.trim().length < 2) return null;
+    return customMlEngine.predict(searchTerm, items, allLocations);
+  }, [searchTerm, items, allLocations]);
+
   // When user clicks an item from search result
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedItem(item);
@@ -95,6 +107,7 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     setLokasi(item.namaTempat || '');
     setLocationError(null);
     setCatatan(item.catatan || '');
+    setLastInputQuery(searchTerm);
     setSearchTerm('');
   };
 
@@ -117,6 +130,16 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     let targetQty = numInput;
     if (mode === 'accumulate') {
       targetQty = (Number(baseItem.qtyFisik) || 0) + numInput;
+    }
+
+    // Machine Learning Auto-learning: Teach the model from this confirmed transaction!
+    if (lastInputQuery && lastInputQuery.trim().length >= 3) {
+      customMlEngine.autoLearnFromConfirmedCount(
+        lastInputQuery,
+        baseItem,
+        targetQty,
+        lokasi.trim()
+      );
     }
 
     const updatedItem: InventoryItem = {
@@ -211,6 +234,17 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              {onOpenMlStudio && (
+                <button
+                  type="button"
+                  onClick={onOpenMlStudio}
+                  title="Buka Studio Machine Learning & Latih Model Sendiri"
+                  className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Studio ML</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsAiModalOpen(true)}
@@ -251,6 +285,66 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
               </button>
             )}
           </div>
+
+          {/* Real-time In-App Machine Learning Prediction Box */}
+          {mlPrediction && mlPrediction.matchedItem && !selectedItem && (
+            <div className="p-3.5 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-emerald-50/80 border-2 border-indigo-200 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-1">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <BrainCircuit className="w-5 h-5 text-indigo-200" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-600 text-white px-2 py-0.5 rounded-md shadow-2xs">
+                      Prediksi ML: {(mlPrediction.confidence * 100).toFixed(0)}%
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Metode: {mlPrediction.method} ({mlPrediction.inferenceTimeMs}ms)
+                    </span>
+                  </div>
+                  <div className="text-sm font-bold text-slate-900 mt-1 truncate">
+                    <span className="text-indigo-600 font-mono mr-1.5">[{mlPrediction.matchedKode}]</span>
+                    <span>{mlPrediction.matchedNama}</span>
+                  </div>
+                  <div className="text-xs text-slate-600 flex flex-wrap items-center gap-3 mt-0.5">
+                    {mlPrediction.qtyFisik !== null && (
+                      <span className="font-semibold text-emerald-700">
+                        Qty Fisik: <span className="font-mono">{mlPrediction.qtyFisik}</span>
+                      </span>
+                    )}
+                    {mlPrediction.lokasi && (
+                      <span className="text-slate-600">
+                        Lokasi: <strong>{mlPrediction.lokasi}</strong>
+                      </span>
+                    )}
+                    {mlPrediction.catatan && (
+                      <span className="text-slate-500 italic">
+                        Catatan: {mlPrediction.catatan}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleApplyAiItem(
+                      mlPrediction.matchedItem!,
+                      mlPrediction.qtyFisik || 0,
+                      mlPrediction.lokasi || '',
+                      mlPrediction.catatan || ''
+                    );
+                  }}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Pilih & Hitung Barang Ini</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Search Results Dropdown List */}
           {searchTerm.trim() && (

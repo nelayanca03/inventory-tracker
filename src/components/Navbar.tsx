@@ -8,7 +8,8 @@ import {
   Database,
   Search,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  BrainCircuit
 } from 'lucide-react';
 import { InventoryItem, UserAccount } from '../types/inventory';
 import { exportInventoryToCsv } from '../services/csvService';
@@ -22,6 +23,7 @@ interface NavbarProps {
   onLogout: () => void;
   onOpenStorageModal?: () => void;
   onOpenAiAssistant?: () => void;
+  onOpenMlStudio?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -31,7 +33,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   items,
   onLogout,
   onOpenStorageModal,
-  onOpenAiAssistant
+  onOpenAiAssistant,
+  onOpenMlStudio
 }) => {
   const isAdmin = currentUser.role === 'admin';
   const pendingCount = isAdmin ? getAllUsers().filter(u => u.status === 'pending').length : 0;
@@ -146,6 +149,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>CSV</span>
                 </button>
               </>
+            )}
+
+            {/* Studio ML (Machine Learning Mandiri) Button */}
+            {onOpenMlStudio && (
+              <button
+                type="button"
+                onClick={onOpenMlStudio}
+                title="Buka Studio Machine Learning (Latih Model & Uji Coba Input)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 rounded-xl transition-all shadow-2xs active:scale-95"
+              >
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="hidden md:inline">Studio ML</span>
+              </button>
             )}
 
             {/* Asisten AI Button */}

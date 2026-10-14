@@ -8,6 +8,7 @@ import { ActivityLogView } from './components/ActivityLogView';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { FirebaseStorageModal } from './components/FirebaseStorageModal';
 import { AIAssistantDrawer } from './components/AIAssistantDrawer';
+import { CustomMlStudioModal } from './components/CustomMlStudioModal';
 import { InventoryItem, AppSettings, UserAccount, InputLog } from './types/inventory';
 import { 
   getStoredItems, 
@@ -42,6 +43,7 @@ export default function App() {
   const [editingMasterItem, setEditingMasterItem] = useState<InventoryItem | null>(null);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+  const [isMlStudioOpen, setIsMlStudioOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
 
@@ -356,6 +358,7 @@ export default function App() {
         onLogout={handleLogout}
         onOpenStorageModal={() => setIsStorageModalOpen(true)}
         onOpenAiAssistant={() => setIsAiDrawerOpen(true)}
+        onOpenMlStudio={() => setIsMlStudioOpen(true)}
       />
 
       {/* Main Content Viewport */}
@@ -379,6 +382,7 @@ export default function App() {
             settings={settings}
             onSaveCount={handleSaveItem}
             onOpenPhotoLightbox={(item) => setLightboxItem(item)}
+            onOpenMlStudio={() => setIsMlStudioOpen(true)}
           />
         )}
 
@@ -501,6 +505,14 @@ export default function App() {
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         items={items}
+      />
+
+      {/* Custom Machine Learning Studio Modal */}
+      <CustomMlStudioModal
+        isOpen={isMlStudioOpen}
+        onClose={() => setIsMlStudioOpen(false)}
+        items={items}
+        availableLocations={settings.availableLocations}
       />
 
       {/* Quiet Footer */}

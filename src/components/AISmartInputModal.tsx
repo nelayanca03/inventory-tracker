@@ -15,9 +15,12 @@ import {
   FileText,
   ArrowRight,
   RefreshCw,
+  BrainCircuit,
+  Zap
 } from 'lucide-react';
 import { InventoryItem } from '../types/inventory';
 import { aiService, SmartParseResult, PhotoIdentifyResult } from '../services/aiService';
+import { customMlEngine } from '../services/customMlEngine';
 
 interface AISmartInputModalProps {
   isOpen: boolean;
@@ -95,6 +98,22 @@ export const AISmartInputModal: React.FC<AISmartInputModalProps> = ({
     const result = await aiService.smartParseInput(query, items);
     setParseResult(result);
     setIsProcessingText(false);
+  };
+
+  const handleProcessWithMl = (textToProcess?: string) => {
+    const query = textToProcess || inputText;
+    if (!query.trim()) return;
+
+    const res = customMlEngine.predict(query, items);
+    setParseResult({
+      matchedKode: res.matchedKode,
+      matchedNama: res.matchedNama,
+      qtyFisik: res.qtyFisik,
+      lokasi: res.lokasi,
+      catatan: res.catatan,
+      confidence: res.confidence,
+      penjelasan: `[Machine Learning Lokal] ${res.breakdown} (Inference: ${res.inferenceTimeMs}ms)`,
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -271,6 +290,7 @@ export const AISmartInputModal: React.FC<AISmartInputModalProps> = ({
                     type="button"
                     onClick={() => handleProcessText()}
                     disabled={isProcessingText || !inputText.trim()}
+                    title="Kirim ke Cloud Gemini AI"
                     className="p-2 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40 rounded-xl transition-colors shadow-2xs"
                   >
                     {isProcessingText ? (
@@ -280,6 +300,25 @@ export const AISmartInputModal: React.FC<AISmartInputModalProps> = ({
                     )}
                   </button>
                 </div>
+              </div>
+
+              {/* Dual Action / Mode Indicator */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-500 text-[11px] flex items-center gap-1">
+                  <span>Pilih Mesin:</span>
+                  <span className="font-semibold text-emerald-700">Cloud Gemini AI</span>
+                  <span>atau</span>
+                  <span className="font-semibold text-indigo-700">Model ML Mandiri</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleProcessWithMl()}
+                  disabled={!inputText.trim()}
+                  className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 active:scale-95 disabled:opacity-40"
+                >
+                  <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>⚡ Uji Model ML Lokal (Instan &lt;3ms)</span>
+                </button>
               </div>
 
               {/* Parsed Output Card */}
