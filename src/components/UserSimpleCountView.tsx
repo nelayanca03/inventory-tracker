@@ -8,13 +8,16 @@ import {
   CheckCircle2, 
   ZoomIn, 
   Package, 
-  Clock,
   Sparkles,
   Info,
   AlertTriangle,
-  Loader2
+  Loader2,
+  X,
+  Camera,
+  Mic
 } from 'lucide-react';
 import { InventoryItem, AppSettings, UserAccount } from '../types/inventory';
+import { AISmartInputModal } from './AISmartInputModal';
 
 interface UserSimpleCountViewProps {
   currentUser: UserAccount;
@@ -38,13 +41,22 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
   const [qtyFisik, setQtyFisik] = useState<number>(0);
   const [lokasi, setLokasi] = useState<string>('');
   const [catatan, setCatatan] = useState<string>('');
-  const [isMatchConfirmed, setIsMatchConfirmed] = useState<boolean>(true);
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userSessionCount, setUserSessionCount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState<boolean>(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const handleApplyAiItem = (item: InventoryItem, qty: number, loc: string, cat: string) => {
+    setSelectedItem(item);
+    setQtyFisik(qty > 0 ? qty : (item.qtyFisik > 0 ? item.qtyFisik : 0));
+    setLokasi(loc || item.namaTempat || '');
+    setLocationError(null);
+    setCatatan(cat || item.catatan || '');
+    setSearchTerm('');
+  };
 
   // Real-time track if someone else updated this item while open
   const currentCloudItem = useMemo(() => {
@@ -80,11 +92,9 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
   const handleSelectItem = (item: InventoryItem) => {
     setSelectedItem(item);
     setQtyFisik(item.qtyFisik > 0 ? item.qtyFisik : 0);
-    // Location is empty initially until user inputs it during counting
     setLokasi(item.namaTempat || '');
     setLocationError(null);
     setCatatan(item.catatan || '');
-    setIsMatchConfirmed(true);
     setSearchTerm('');
   };
 
@@ -96,7 +106,7 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     if (!selectedItem || isSubmitting) return;
 
     if (!lokasi.trim()) {
-      setLocationError('Silakan pilih atau ketik lokasi rak tempat barang ini dihitung.');
+      setLocationError('Pilih atau ketik lokasi rak tempat barang ini dihitung.');
       return;
     }
 
@@ -127,11 +137,11 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
 
       if (mode === 'accumulate') {
         setSaveSuccessNotice(
-          `✓ Berhasil menambahkan +${numInput} ${selectedItem.satuan}. Total fisik terakumulasi: ${targetQty} ${selectedItem.satuan} di ${lokasi}`
+          `✓ Ditambahkan +${numInput} ${selectedItem.satuan}. Total fisik: ${targetQty} ${selectedItem.satuan} di ${lokasi}`
         );
       } else {
         setSaveSuccessNotice(
-          `✓ Data "${selectedItem.namaStok}" berhasil disimpan: ${targetQty} ${selectedItem.satuan} di ${lokasi}`
+          `✓ Tersimpan: ${selectedItem.namaStok} (${targetQty} ${selectedItem.satuan}) di ${lokasi}`
         );
       }
 
@@ -139,15 +149,13 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
       setSearchTerm('');
       setLocationError(null);
       
-      // Auto clear success notice after 4 seconds
       setTimeout(() => {
         setSaveSuccessNotice(null);
-      }, 4000);
+      }, 3500);
 
-      // Refocus search for next item
       setTimeout(() => {
         searchInputRef.current?.focus();
-      }, 200);
+      }, 150);
     } catch (err) {
       console.error('Submit error:', err);
       setLocationError('Gagal menyimpan data ke cloud. Silakan coba lagi.');
@@ -157,94 +165,111 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-16">
+    <div className="max-w-3xl mx-auto space-y-5 pb-16">
       
-      {/* Operator Welcome Banner */}
-      <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs flex items-center justify-between gap-4">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Operator: {currentUser.fullName}
-          </div>
-          <h2 className="text-base sm:text-lg font-bold text-white mt-0.5">
-            Pencocokan Foto & Input Jumlah Stok
-          </h2>
-          <p className="text-xs text-slate-300 mt-1">
-            Cari nama barang, cocokkan fisik barang dengan foto resmi admin, lalu masukkan jumlah & lokasinya.
-          </p>
-        </div>
-
-        {userSessionCount > 0 && (
-          <div className="shrink-0 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-center">
-            <div className="text-[10px] text-slate-400">Telah Dihitung</div>
-            <div className="text-base font-bold font-mono text-emerald-400">
-              {userSessionCount} item
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Success Notification Alert */}
       {saveSuccessNotice && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2 shadow-xs animate-in fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          <span>{saveSuccessNotice}</span>
+        <div className="p-3.5 bg-emerald-600 text-white rounded-2xl text-xs font-semibold flex items-center justify-between shadow-md animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+            <span>{saveSuccessNotice}</span>
+          </div>
+          <span className="text-[11px] text-emerald-200">Siap input berikutnya</span>
         </div>
       )}
 
-      {/* STEP 1: Search Bar (Ultra Simple - Hanya Searching Nama) */}
+      {/* STATE 1: SEARCH & SELECT BARANG */}
       {!selectedItem && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-900 uppercase tracking-wide mb-2">
-              Langkah 1: Cari Nama Barang
-            </label>
-            <div className="relative">
-              <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                autoFocus
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Cari nama barang..."
-                className="w-full pl-12 pr-4 py-3.5 text-base border-2 border-slate-200 rounded-xl focus:border-slate-900 focus:ring-0 outline-none transition-all placeholder:text-slate-400"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 p-1"
-                >
-                  Batal
-                </button>
-              )}
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-xs space-y-5">
+          
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                Stasiun Hitung Opname
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cari barang berdasarkan nama atau kode untuk mencocokkan fisik & foto
+              </p>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              Ketik nama barang yang Anda temukan di rak gudang untuk melihat foto dan mengisi jumlah.
-            </p>
+
+            {userSessionCount > 0 && (
+              <div className="self-start sm:self-auto px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold font-mono">
+                ✓ {userSessionCount} barang dihitung sesi ini
+              </div>
+            )}
+          </div>
+
+          {/* AI Smart Input Quick Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-linear-to-r from-emerald-50 via-teal-50 to-indigo-50 border border-emerald-200/80 rounded-2xl">
+            <div className="flex items-center gap-2 pl-1">
+              <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              </div>
+              <div className="text-xs">
+                <span className="font-bold text-slate-900 block leading-tight">AI Smart Input & Scan Foto</span>
+                <span className="text-[11px] text-slate-500">Hitung lebih cepat lewat suara, kalimat bebas, atau foto barang</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(true)}
+                className="flex-1 sm:flex-initial px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Mic className="w-3.5 h-3.5 text-amber-300" />
+                <span>Input Suara / Teks</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAiModalOpen(true)}
+                className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Camera className="w-3.5 h-3.5 text-indigo-200" />
+                <span>Scan Foto Barang</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Search Box */}
+          <div className="relative">
+            <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              autoFocus
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Ketik nama atau kode barang..."
+              className="w-full pl-12 pr-10 py-3.5 text-base border-2 border-slate-200 focus:border-slate-900 rounded-2xl outline-hidden transition-all placeholder:text-slate-400 font-medium shadow-2xs"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* Search Results Dropdown List */}
           {searchTerm.trim() && (
-            <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100 bg-white shadow-sm">
+            <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-white shadow-md">
               {searchResults.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 text-xs">
-                  <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  Barang "<strong>{searchTerm}</strong>" belum terdaftar di master data.
-                  <div className="mt-2 text-[11px] text-slate-400">
-                    Hanya admin yang berwenang menambahkan master barang baru. Silakan hubungi admin gudang.
-                  </div>
+                <div className="p-8 text-center text-slate-500 text-xs space-y-1">
+                  <Package className="w-8 h-8 text-slate-300 mx-auto" />
+                  <div className="font-semibold text-slate-700">Barang &quot;{searchTerm}&quot; tidak ditemukan</div>
+                  <p className="text-[11px] text-slate-400">Pastikan ejaan nama atau kode stok sudah sesuai.</p>
                 </div>
               ) : (
                 searchResults.map(item => (
                   <button
                     key={item.id}
                     onClick={() => handleSelectItem(item)}
-                    className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group"
+                    className="w-full p-3.5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
-                      {/* Photo Thumbnail */}
-                      <div className="w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
                         {item.gambarUrl ? (
                           <img
                             src={item.gambarUrl}
@@ -257,21 +282,27 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                         )}
                       </div>
 
-                      <div>
-                        <div className="text-sm font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-slate-900 truncate group-hover:text-emerald-700 transition-colors">
                           {item.namaStok}
                         </div>
-                        <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 font-mono">
+                        <div className="text-xs text-slate-500 font-mono mt-0.5 truncate">
                           <span>{item.kodeStok}</span>
-                          <span>·</span>
-                          <span>Rak Bawaan: {item.namaTempat}</span>
+                          <span className="mx-1.5 text-slate-300">·</span>
+                          <span className="text-slate-600">{item.namaTempat || 'Lokasi belum ditentukan'}</span>
+                          {item.qtyFisik > 0 && (
+                            <>
+                              <span className="mx-1.5 text-slate-300">·</span>
+                              <span className="text-emerald-700 font-semibold">Tercatat: {item.qtyFisik} {item.satuan}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 pl-2">
-                      <span className="text-xs font-bold text-white bg-slate-900 group-hover:bg-emerald-600 px-3 py-1.5 rounded-lg transition-colors">
-                        Pilih & Hitung →
+                    <div className="shrink-0 pl-3">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-white bg-slate-100 group-hover:bg-slate-900 px-3.5 py-1.5 rounded-xl transition-all shadow-2xs">
+                        Hitung →
                       </span>
                     </div>
                   </button>
@@ -282,19 +313,20 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
 
           {/* Quick Item List if no search query */}
           {!searchTerm.trim() && (
-            <div className="pt-2">
-              <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
-                <span>Atau Pilih Cepat Barang di Bawah:</span>
-                <span className="text-[11px] text-slate-400">{items.length} master barang</span>
+            <div className="pt-2 space-y-2.5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">Daftar Barang Master:</span>
+                <span className="font-mono text-[11px]">{items.length} produk</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
-                {items.slice(0, 6).map(item => (
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                {items.slice(0, 8).map(item => (
                   <button
                     key={item.id}
                     onClick={() => handleSelectItem(item)}
-                    className="p-2.5 rounded-xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50/80 transition-all flex items-center gap-2.5 text-left"
+                    className="p-3 rounded-2xl border border-slate-200 hover:border-slate-400 hover:bg-slate-50 transition-all flex items-center gap-3 text-left group cursor-pointer"
                   >
-                    <div className="w-10 h-10 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
+                    <div className="w-11 h-11 rounded-xl border border-slate-200 overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
                       {item.gambarUrl ? (
                         <img
                           src={item.gambarUrl}
@@ -303,17 +335,15 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <Package className="w-4 h-4" />
-                        </div>
+                        <Package className="w-5 h-5 text-slate-300" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-slate-900 truncate">
+                      <div className="text-xs font-bold text-slate-900 truncate group-hover:text-emerald-700">
                         {item.namaStok}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        {item.kodeStok} {item.namaTempat ? `· 📍 ${item.namaTempat}` : '· (Belum ada lokasi)'}
+                      <div className="text-[11px] text-slate-400 font-mono mt-0.5 truncate">
+                        {item.kodeStok} · {item.namaTempat || 'Belum ada rak'}
                       </div>
                     </div>
                   </button>
@@ -325,222 +355,210 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
         </div>
       )}
 
-      {/* STEP 2: The Item Verification & Counting Card (Ultra Simple & Ergonomic) */}
+      {/* STATE 2: FOCUS COUNTING TERMINAL (CLEAN & TACTILE) */}
       {selectedItem && (
-        <div className="bg-white border-2 border-slate-900 rounded-2xl overflow-hidden shadow-lg space-y-0 animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-150">
           
           {/* Header of Selected Item */}
-          <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-mono tracking-wider uppercase text-emerald-400 bg-slate-800 px-2 py-0.5 rounded">
+          <div className="px-6 py-4.5 bg-slate-900 text-white flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <span className="text-[10px] font-mono tracking-wider uppercase text-emerald-400 bg-white/10 px-2 py-0.5 rounded-md font-bold">
                 {selectedItem.kodeStok}
               </span>
-              <h3 className="text-lg font-bold text-white mt-1">
+              <h3 className="text-base sm:text-lg font-bold text-white mt-1 truncate">
                 {selectedItem.namaStok}
               </h3>
             </div>
             
             <button
               onClick={() => setSelectedItem(null)}
-              className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-xs text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl transition-colors shrink-0 font-medium"
             >
               Ganti Barang
             </button>
           </div>
 
-          <div className="p-5 sm:p-6 space-y-6">
+          <div className="p-6 sm:p-8 space-y-6">
             
-            {/* Foto Master dari Admin & Instruksi Pencocokan */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
-                <span>Foto Referensi Master (Dari Admin):</span>
-                <span className="text-[11px] text-slate-500 font-normal">
-                  Klik foto untuk perbesar
+            {/* Top Split: Photo & Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-center pb-5 border-b border-slate-100">
+              
+              {/* Photo Box */}
+              <div>
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                  Foto Master Resmi Admin
                 </span>
+                {selectedItem.gambarUrl ? (
+                  <div 
+                    onClick={() => onOpenPhotoLightbox(selectedItem)}
+                    className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center hover:ring-2 hover:ring-slate-900 transition-all shadow-2xs"
+                    title="Klik untuk melihat foto ukuran penuh"
+                  >
+                    <img
+                      src={selectedItem.gambarUrl}
+                      alt={selectedItem.namaStok}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-contain"
+                    />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1.5 backdrop-blur-xs">
+                      <ZoomIn className="w-4 h-4" />
+                      <span>Perbesar Foto</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="aspect-video bg-slate-50 border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-slate-400 text-xs p-4 text-center">
+                    <Package className="w-7 h-7 text-slate-300 mb-1" />
+                    <span>Belum ada foto master</span>
+                  </div>
+                )}
               </div>
 
-              {selectedItem.gambarUrl ? (
-                <div 
-                  onClick={() => onOpenPhotoLightbox(selectedItem)}
-                  className="relative group cursor-pointer aspect-video sm:aspect-[21/9] rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center hover:ring-2 hover:ring-slate-900 transition-all"
-                >
-                  <img
-                    src={selectedItem.gambarUrl}
-                    alt={selectedItem.namaStok}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-contain"
-                  />
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1.5 backdrop-blur-xs">
-                    <ZoomIn className="w-4 h-4" />
-                    <span>Perbesar Foto</span>
-                  </div>
-                  <div className="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[10px] px-2 py-0.5 rounded backdrop-blur-xs">
-                    Foto Resmi Admin
-                  </div>
+              {/* System Specs Box */}
+              <div className="space-y-3 bg-slate-50 p-4.5 rounded-2xl border border-slate-200/80 text-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                  <span className="text-slate-500">Stok Sistem:</span>
+                  <span className="font-bold font-mono text-slate-900 text-sm">
+                    {selectedItem.qtySistem} {selectedItem.satuan}
+                  </span>
                 </div>
-              ) : (
-                <div className="p-6 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
-                  <Package className="w-8 h-8 text-slate-300 mx-auto mb-1" />
-                  Admin belum mengunggah foto master untuk barang ini.
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                  <span className="text-slate-500">Kategori:</span>
+                  <span className="font-medium text-slate-800">{selectedItem.kategori}</span>
                 </div>
-              )}
-
-              {/* Visual Confirmation Checkbox */}
-              <div className="pt-1 flex items-center gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <input
-                  id="confirmMatch"
-                  type="checkbox"
-                  checked={isMatchConfirmed}
-                  onChange={(e) => setIsMatchConfirmed(e.target.checked)}
-                  className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300"
-                />
-                <label htmlFor="confirmMatch" className="text-xs text-slate-700 font-medium select-none cursor-pointer">
-                  Saya sudah mencocokkan bentuk fisik barang dengan foto master di atas.
-                </label>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Rak Default:</span>
+                  <span className="font-medium text-slate-800">{selectedItem.namaTempat || 'Belum diatur'}</span>
+                </div>
               </div>
+
             </div>
 
-            {/* Input Qty Fisik (Lapang & Mudah untuk Jari) */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            {/* Input Qty Fisik Counter */}
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                  Jumlah Fisik Aktual di Lokasi
+                  Hasil Hitungan Fisik Aktual
                 </label>
                 <span className="text-xs font-mono text-slate-500">
-                  Satuan: <strong className="text-slate-800">{selectedItem.satuan}</strong>
+                  Satuan: <strong className="text-slate-900">{selectedItem.satuan}</strong>
                 </span>
               </div>
 
-              {/* Large Plus/Minus Controls */}
-              <div className="flex items-center gap-3">
+              {/* Large Minus / Input / Plus */}
+              <div className="flex items-center gap-2.5 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => handleQuickAddQty(-1)}
-                  className="w-14 h-14 bg-white border border-slate-300 hover:bg-slate-100 rounded-xl text-slate-800 text-2xl font-bold flex items-center justify-center active:bg-slate-200 shadow-xs transition-colors shrink-0"
+                  disabled={qtyFisik <= 0}
+                  className="w-14 h-14 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 border border-slate-300 rounded-2xl text-slate-800 text-2xl font-black flex items-center justify-center active:scale-95 transition-all shrink-0 cursor-pointer"
+                  title="Kurangi 1"
                 >
                   <Minus className="w-6 h-6" />
                 </button>
 
-                <div className="flex-1 text-center bg-white border border-slate-300 rounded-xl py-2 px-3 shadow-xs">
+                <div className="flex-1 bg-white border-2 border-slate-300 focus-within:border-slate-900 rounded-2xl py-2 px-3 shadow-2xs transition-colors">
                   <input
                     type="number"
                     min="0"
                     step="any"
                     value={qtyFisik}
                     onChange={(e) => setQtyFisik(Math.max(0, parseFloat(e.target.value) || 0))}
-                    className="w-full text-center text-3xl sm:text-4xl font-black font-mono text-slate-900 outline-none"
+                    className="w-full text-center text-3xl sm:text-4xl font-black font-mono text-slate-900 outline-hidden"
                   />
-                  <div className="text-[11px] text-slate-400 font-sans">
-                    Hasil hitungan fisik
+                  <div className="text-[10px] text-slate-400 font-sans text-center mt-0.5">
+                    Ketik angka langsung atau gunakan tombol +/-
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => handleQuickAddQty(1)}
-                  className="w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-2xl font-bold flex items-center justify-center active:bg-slate-700 shadow-xs transition-colors shrink-0"
+                  className="w-14 h-14 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-2xl font-black flex items-center justify-center active:scale-95 shadow-xs transition-all shrink-0 cursor-pointer"
+                  title="Tambah 1"
                 >
                   <Plus className="w-6 h-6" />
                 </button>
               </div>
 
               {/* Quick Numpad Chips */}
-              <div className="flex items-center justify-between pt-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-slate-400">Tambah cepat:</span>
+              <div className="flex items-center gap-1.5 pt-1 text-xs">
+                <span className="text-[11px] text-slate-400 mr-1">Tambah cepat:</span>
+                {[5, 10, 50, 100].map(amt => (
                   <button
+                    key={amt}
                     type="button"
-                    onClick={() => handleQuickAddQty(5)}
-                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg font-mono font-medium text-slate-700"
+                    onClick={() => handleQuickAddQty(amt)}
+                    className="px-3 py-1 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg font-mono font-bold text-slate-700 text-xs transition-colors"
                   >
-                    +5
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddQty(10)}
-                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg font-mono font-medium text-slate-700"
-                  >
-                    +10
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickAddQty(50)}
-                    className="px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg font-mono font-medium text-slate-700"
-                  >
-                    +50
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Input Lokasi / Tempat (Wajib ditentukan saat penginputan) */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-slate-600" />
-                  Lokasi / Rak Penginputan <span className="text-rose-500">*</span>
-                </label>
-                <span className="text-[11px] text-slate-500">
-                  Wajib ditentukan saat hitung fisik
-                </span>
-              </div>
-
-              <div className="relative">
-                <input
-                  type="text"
-                  value={lokasi}
-                  onChange={(e) => {
-                    setLokasi(e.target.value);
-                    if (locationError) setLocationError(null);
-                  }}
-                  placeholder="Pilih atau ketik lokasi..."
-                  className={`w-full px-4 py-3 text-sm border rounded-xl focus:ring-1 outline-none transition-colors ${
-                    locationError 
-                      ? 'border-rose-400 bg-rose-50/30 focus:border-rose-600 focus:ring-rose-600' 
-                      : 'border-slate-300 focus:border-slate-900 focus:ring-slate-900'
-                  }`}
-                />
-              </div>
-
-              {locationError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-medium">
-                  {locationError}
-                </div>
-              )}
-
-              {/* Quick Suggestion Chips for Location */}
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                <span className="text-[10px] text-slate-400 self-center">Pilihan cepat lokasi:</span>
-                {allLocations.map((loc) => (
-                  <button
-                    key={loc}
-                    type="button"
-                    onClick={() => {
-                      setLokasi(loc);
-                      if (locationError) setLocationError(null);
-                    }}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-colors ${
-                      lokasi === loc
-                        ? 'bg-slate-900 text-white border-slate-900 font-medium shadow-xs'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {loc}
+                    +{amt}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Input Lokasi / Rak */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                Lokasi / Rak Gudang <span className="text-rose-500">*</span>
+              </label>
+
+              <input
+                type="text"
+                value={lokasi}
+                onChange={(e) => {
+                  setLokasi(e.target.value);
+                  if (locationError) setLocationError(null);
+                }}
+                placeholder="Pilih atau ketik lokasi rak..."
+                className={`w-full px-4 py-3 text-sm border rounded-xl outline-hidden transition-all ${
+                  locationError 
+                    ? 'border-rose-400 bg-rose-50/40 focus:border-rose-600' 
+                    : 'border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900'
+                }`}
+              />
+
+              {locationError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-semibold">
+                  {locationError}
+                </div>
+              )}
+
+              {/* Quick Suggestion Chips */}
+              {allLocations.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {allLocations.slice(0, 6).map(loc => (
+                    <button
+                      key={loc}
+                      type="button"
+                      onClick={() => {
+                        setLokasi(loc);
+                        if (locationError) setLocationError(null);
+                      }}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                        lokasi === loc
+                          ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {loc}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Catatan Tambahan (Opsional) */}
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                Catatan (Opsional)
+                Catatan Fisik (Opsional)
               </label>
               <input
                 type="text"
                 value={catatan}
                 onChange={(e) => setCatatan(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:border-slate-900 outline-none"
+                placeholder="Contoh: Dus agak penyok, sisa di lantai..."
+                className="w-full px-3.5 py-2 text-xs border border-slate-200 rounded-xl focus:border-slate-900 outline-hidden"
               />
             </div>
 
@@ -553,10 +571,10 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                     Peringatan: Barang ini baru saja diinput oleh &quot;{currentCloudItem?.petugas}&quot;!
                   </div>
                   <p className="text-slate-700">
-                    Jumlah fisik saat ini di database: <strong>{currentCloudItem?.qtyFisik} {selectedItem.satuan}</strong> di <strong>{currentCloudItem?.namaTempat || 'lokasi'}</strong>.
+                    Jumlah fisik di database saat ini: <strong>{currentCloudItem?.qtyFisik} {selectedItem.satuan}</strong> di <strong>{currentCloudItem?.namaTempat || 'lokasi'}</strong>.
                   </p>
                   <p className="text-amber-800 font-medium">
-                    Agar tidak saling menimpa, Anda dapat memilih untuk <strong>Menambahkan (Akumulasi)</strong> atau <strong>Mengganti Total</strong>.
+                    Pilih <strong>Tambah (Akumulasi)</strong> agar kedua hitungan digabung, atau <strong>Ganti Nilai Total</strong> jika mengoreksi.
                   </p>
                 </div>
               </div>
@@ -564,26 +582,25 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
 
             {/* Previous count info */}
             {((currentCloudItem?.qtyFisik || selectedItem.qtyFisik) > 0) && !wasUpdatedByOther && (
-              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between text-xs text-indigo-950">
+              <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-700">
                 <div className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <Info className="w-4 h-4 text-slate-500 shrink-0" />
                   <span>
-                    Stok fisik sebelumnya di database: <strong>{currentCloudItem?.qtyFisik || selectedItem.qtyFisik} {selectedItem.satuan}</strong> (oleh {currentCloudItem?.petugas || selectedItem.petugas})
+                    Stok fisik tercatat sebelumnya: <strong>{currentCloudItem?.qtyFisik || selectedItem.qtyFisik} {selectedItem.satuan}</strong> (oleh {currentCloudItem?.petugas || selectedItem.petugas})
                   </span>
                 </div>
               </div>
             )}
 
-            {/* Action Buttons (Guaranteed Concurrency & Anti Double-Submit) */}
+            {/* Submit Action Buttons */}
             <div className="pt-2 space-y-2">
               {((currentCloudItem?.qtyFisik || selectedItem.qtyFisik) > 0) ? (
                 <>
-                  {/* Option 1: Accumulate (Best for multi-rack / multi-operator count) */}
                   <button
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => handleConfirmSubmit('accumulate')}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                   >
                     {isSubmitting ? (
                       <>
@@ -600,24 +617,22 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                     )}
                   </button>
 
-                  {/* Option 2: Overwrite / Replace */}
                   <button
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => handleConfirmSubmit('replace')}
-                    className="w-full py-3 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-300 text-slate-800 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-3 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-300 text-slate-800 rounded-2xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <Check className="w-4 h-4 text-slate-600" />
                     <span>Ganti Nilai Total Menjadi {qtyFisik} {selectedItem.satuan}</span>
                   </button>
                 </>
               ) : (
-                /* Standard First-Time Save */
                 <button
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => handleConfirmSubmit('replace')}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.99] text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-2xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                 >
                   {isSubmitting ? (
                     <>
@@ -637,6 +652,14 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* AI Smart Input Modal */}
+      <AISmartInputModal
+        isOpen={isAiModalOpen}
+        onClose={() => setIsAiModalOpen(false)}
+        items={items}
+        onApplyParsedItem={handleApplyAiItem}
+      />
 
     </div>
   );

@@ -37,7 +37,8 @@ import {
   RefreshCw,
   Eye,
   Info,
-  Database
+  Database,
+  Crop
 } from 'lucide-react';
 import { InventoryItem, AppSettings, UserAccount } from '../types/inventory';
 import { 
@@ -51,6 +52,7 @@ import {
 import { exportInventoryToCsv, readSpreadsheetFile, parseCsvText, downloadCsvTemplate } from '../services/csvService';
 import { AdminUserVerification } from './AdminUserVerification';
 import { BulkItemSettingsModal } from './BulkItemSettingsModal';
+import { CatalogBatchPhotoModal } from './CatalogBatchPhotoModal';
 import { getAllUsers } from '../services/authService';
 
 interface AdminMasterManagementProps {
@@ -92,6 +94,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isBulkSettingsOpen, setIsBulkSettingsOpen] = useState(false);
+  const [isCatalogPhotoModalOpen, setIsCatalogPhotoModalOpen] = useState(false);
 
   // Search & Filter in Master Items
   const [searchQuery, setSearchQuery] = useState('');
@@ -757,80 +760,93 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
       {activeSubTab === 'barang' && (
         <div className="space-y-4">
           
-          {/* Quick Stats & Action Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-4 text-xs">
+          {/* Quick Stats & Unified Action Bar */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            
+            {/* Minimalist Stats */}
+            <div className="flex items-center gap-4 text-xs font-medium">
               <div>
-                <span className="text-slate-500 block text-[11px]">Total Master Barang</span>
-                <span className="text-base font-bold text-slate-900">{items.length} item</span>
+                <span className="text-slate-400 text-[11px] block">Total Master</span>
+                <span className="text-lg font-black text-slate-900 font-mono">{items.length}</span>
               </div>
-              <div className="h-7 w-px bg-slate-200 hidden sm:block" />
+              <div className="h-7 w-px bg-slate-200" />
               <div>
-                <span className="text-slate-500 block text-[11px]">Sudah Ada Lokasi</span>
-                <span className="text-base font-bold text-emerald-600">
-                  {items.filter(i => !!i.namaTempat).length} item
+                <span className="text-slate-400 text-[11px] block">Ada Lokasi</span>
+                <span className="text-lg font-black text-emerald-600 font-mono">
+                  {items.filter(i => !!i.namaTempat).length}
                 </span>
               </div>
-              <div className="h-7 w-px bg-slate-200 hidden sm:block" />
+              <div className="h-7 w-px bg-slate-200" />
               <div>
-                <span className="text-slate-500 block text-[11px]">Belum Diinput Lokasi</span>
-                <span className="text-base font-bold text-amber-600">
-                  {items.filter(i => !i.namaTempat).length} item
+                <span className="text-slate-400 text-[11px] block">Belum Ada Lokasi</span>
+                <span className="text-lg font-black text-amber-600 font-mono">
+                  {items.filter(i => !i.namaTempat).length}
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            {/* Harmonized Button Group */}
+            <div className="flex flex-wrap items-center gap-2">
               {onBulkUpdateItems && (
                 <button
                   type="button"
                   onClick={() => setIsBulkSettingsOpen(true)}
-                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                  className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
                   title="Atur lokasi, kategori, satuan, atau reset fisik untuk semua item sekaligus"
                 >
                   <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Atur Semua Item Sekaligus</span>
-                </button>
-              )}
-
-              {onOpenStorageModal && (
-                <button
-                  type="button"
-                  onClick={onOpenStorageModal}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
-                  title="Cek sisa kuota dan penggunaan storage database Firebase"
-                >
-                  <Database className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Storage DB</span>
+                  <span>Atur Masal</span>
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={() => setActiveSubTab('lokasi')}
-                className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
                 title="Kelola daftar lokasi rak untuk pilihan input user"
               >
-                <MapPin className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Kelola Lokasi ({locations.length})</span>
+                <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                <span>Lokasi ({locations.length})</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveSubTab('upload-csv')}
-                className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
               >
-                <Upload className="w-3.5 h-3.5" />
-                <span>+ Upload Excel / CSV</span>
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Upload CSV</span>
               </button>
 
               <button
                 type="button"
+                onClick={() => setIsCatalogPhotoModalOpen(true)}
+                className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs"
+                title="Auto-potong foto halaman katalog atau upload banyak foto sekaligus"
+              >
+                <Crop className="w-3.5 h-3.5" />
+                <span>Foto Katalog</span>
+              </button>
+
+              {onOpenStorageModal && (
+                <button
+                  type="button"
+                  onClick={onOpenStorageModal}
+                  className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Cek kapasitas database Firebase"
+                >
+                  <Database className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Storage DB</span>
+                </button>
+              )}
+
+              <button
+                type="button"
                 onClick={handleOpenAddForm}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 ml-1"
               >
                 <Plus className="w-4 h-4 text-emerald-400" />
-                <span>+ Tambah Barang Manual</span>
+                <span>+ Tambah Barang</span>
               </button>
             </div>
           </div>
@@ -2684,6 +2700,14 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
           }}
         />
       )}
+
+      {/* Catalog Batch Photo Modal (3x3 Page Cropper & Batch Matcher) */}
+      <CatalogBatchPhotoModal
+        isOpen={isCatalogPhotoModalOpen}
+        onClose={() => setIsCatalogPhotoModalOpen(false)}
+        items={items}
+        onUpdateItem={onSaveItem}
+      />
 
     </div>
   );

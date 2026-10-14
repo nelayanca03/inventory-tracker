@@ -18,7 +18,8 @@ import {
   FileSpreadsheet,
   Download,
   Copy,
-  RotateCcw
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import { InventoryItem, FilterState, ViewMode } from '../types/inventory';
 import { exportInventoryToCsv, copyInventoryToClipboardTSV } from '../services/csvService';
@@ -31,6 +32,7 @@ interface InventoryListProps {
   onQuickUpdateQty: (id: string, newQtyFisik: number) => void;
   onResetAllQtyFisik?: () => void;
   onOpenPhotoLightbox: (item: InventoryItem) => void;
+  onOpenAiAudit?: () => void;
 }
 
 /**
@@ -142,7 +144,8 @@ export const InventoryList: React.FC<InventoryListProps> = ({
   onDelete,
   onQuickUpdateQty,
   onResetAllQtyFisik,
-  onOpenPhotoLightbox
+  onOpenPhotoLightbox,
+  onOpenAiAudit
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [copied, setCopied] = useState(false);
@@ -278,58 +281,59 @@ export const InventoryList: React.FC<InventoryListProps> = ({
     <div className="space-y-6">
       
       {/* Metrics Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-          <div className="text-xs text-slate-500 font-medium">Total Dihitung</div>
-          <div className="text-2xl font-bold font-mono text-slate-900 mt-1">
-            {stats.totalItems} <span className="text-xs font-sans font-normal text-slate-400">item</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-2xs">
+          <div className="text-[11px] text-slate-500 font-semibold uppercase tracking-wider">Total Barang</div>
+          <div className="text-2xl font-black font-mono text-slate-900 mt-1">
+            {stats.totalItems} <span className="text-xs font-normal text-slate-400">item</span>
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Total fisik: <strong className="font-mono">{stats.totalQtyFisik.toLocaleString('id-ID')}</strong> unit
+            Total fisik: <strong className="font-mono text-slate-800">{stats.totalQtyFisik.toLocaleString('id-ID')}</strong> unit
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-          <div className="text-xs text-emerald-700 font-medium flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Stok Sesuai (100% Match)
+        <div className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-2xs">
+          <div className="text-[11px] text-emerald-800 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            Stok Sesuai (Match)
           </div>
-          <div className="text-2xl font-bold font-mono text-emerald-700 mt-1">
+          <div className="text-2xl font-black font-mono text-emerald-700 mt-1">
             {stats.sesuaiCount}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            {stats.totalItems > 0 ? Math.round((stats.sesuaiCount / stats.totalItems) * 100) : 0}% tingkat akurasi
+            {stats.totalItems > 0 ? Math.round((stats.sesuaiCount / stats.totalItems) * 100) : 0}% akurasi fisik
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-          <div className="text-xs text-rose-700 font-medium flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            Selisih Kurang (Minus)
+        <div className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-2xs">
+          <div className="text-[11px] text-rose-800 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            Selisih Kurang
           </div>
-          <div className="text-2xl font-bold font-mono text-rose-700 mt-1">
+          <div className="text-2xl font-black font-mono text-rose-700 mt-1">
             {stats.minusCount}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Perlu investigasi fisik
+            Fisik kurang dari sistem
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-          <div className="text-xs text-amber-700 font-medium">
-            Selisih Lebih (Surplus)
+        <div className="bg-white border border-slate-200 rounded-2xl p-4.5 shadow-2xs">
+          <div className="text-[11px] text-amber-800 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            Selisih Lebih
           </div>
-          <div className="text-2xl font-bold font-mono text-amber-700 mt-1">
+          <div className="text-2xl font-black font-mono text-amber-700 mt-1">
             {stats.plusCount}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Barang berlebih di rak
+            Fisik berlebih di rak
           </div>
         </div>
       </div>
 
       {/* Control Strip: Search & Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           
           {/* Search Box */}
@@ -340,7 +344,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
               value={filters.searchTerm}
               onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
               placeholder="Cari data opname..."
-              className="w-full pl-9 pr-8 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all placeholder:text-slate-400"
+              className="w-full pl-9 pr-8 py-2 text-xs border border-slate-200 rounded-xl focus:border-slate-900 outline-hidden transition-all placeholder:text-slate-400 bg-slate-50/50 focus:bg-white"
             />
             {filters.searchTerm && (
               <button
@@ -353,22 +357,22 @@ export const InventoryList: React.FC<InventoryListProps> = ({
           </div>
 
           {/* Quick Action Buttons on Toolbar */}
-          <div className="flex items-center gap-2 self-end md:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
             {/* View Mode Toggle */}
-            <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200/80">
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
-                title="Tampilan Tabel Lapang"
+                title="Tampilan Tabel"
               >
                 <LayoutList className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('card')}
-                className={`p-1.5 rounded-md transition-colors ${
-                  viewMode === 'card' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                className={`p-1.5 rounded-lg transition-all ${
+                  viewMode === 'card' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
                 }`}
                 title="Tampilan Kartu Foto"
               >
@@ -376,26 +380,48 @@ export const InventoryList: React.FC<InventoryListProps> = ({
               </button>
             </div>
 
+            {/* Analisis Audit AI Button */}
+            {onOpenAiAudit && (
+              <button
+                type="button"
+                onClick={onOpenAiAudit}
+                className="px-3 py-2 bg-linear-to-r from-indigo-600 to-slate-900 hover:from-indigo-500 hover:to-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 border border-indigo-400/40"
+                title="Buka Analisis Audit & Anomali AI"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                <span>Analisis Audit AI</span>
+              </button>
+            )}
+
+            {/* Quick Export Tools */}
+            <button
+              onClick={() => exportInventoryToCsv(filteredItems)}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-xl transition-all shadow-2xs flex items-center gap-1.5"
+              title="Download CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Download CSV</span>
+            </button>
+
             {/* Kosongkan Semua Qty Fisik Button */}
             {onResetAllQtyFisik && (
               <button
                 type="button"
                 onClick={() => setShowResetConfirm(true)}
-                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-[0.98]"
+                className="px-3 py-2 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shadow-2xs active:scale-[0.98]"
                 title="Kosongkan (reset ke 0) seluruh Qty Fisik hasil hitung"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-                <span className="hidden sm:inline">Kosongkan Semua Qty Fisik</span>
-                <span className="sm:hidden">Kosongkan Fisik</span>
+                <span>Kosongkan Fisik</span>
               </button>
             )}
 
             <button
               onClick={onAddNew}
-              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-[0.98]"
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap shadow-xs active:scale-[0.98]"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Input Data Baru</span>
+              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>+ Input Baru</span>
             </button>
           </div>
         </div>
