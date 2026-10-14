@@ -8,7 +8,8 @@ import {
   deleteDoc, 
   onSnapshot, 
   writeBatch,
-  getDocs
+  getDocs,
+  runTransaction
 } from 'firebase/firestore';
 import { InventoryItem, AppSettings, UserAccount, InputLog } from '../types/inventory';
 import { DEFAULT_SETTINGS } from './storageService';
@@ -72,6 +73,47 @@ export function subscribeToCloudInventory(
 export async function saveCloudInventoryItem(item: InventoryItem): Promise<void> {
   const docRef = doc(db, ITEMS_COLLECTION, item.id);
   await setDoc(docRef, { ...item, updatedAt: new Date().toISOString() }, { merge: true });
+}
+
+/**
+ * Atomic save with real-time accumulation and concurrency safety.
+ * When two users submit counts at the exact same time, this ensures
+ * that no counts are overwritten or lost.
+ */
+export async function saveCloudInventoryItemAtomic(
+  item: InventoryItem,
+  mode: 'replace' | 'accumulate' = 'replace',
+  addedQty = 0
+): Promise<InventoryItem> {
+  const docRef = doc(db, ITEMS_COLLECTION, item.id);
+  return await runTransaction(db, async (transaction) => {
+    const serverDoc = await transaction.get(docRef);
+    let finalItem: InventoryItem = { ...item };
+
+    if (serverDoc.exists()) {
+      const serverData = serverDoc.data() as InventoryItem;
+      if (mode === 'accumulate') {
+        const newQtyFisik = (Number(serverData.qtyFisik) || 0) + addedQty;
+        finalItem = {
+          ...serverData,
+          ...item,
+          qtyFisik: newQtyFisik,
+          selisih: newQtyFisik - serverData.qtySistem,
+          isCounted: true,
+          updatedAt: new Date().toISOString()
+        };
+      } else {
+        finalItem = {
+          ...serverData,
+          ...item,
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+
+    transaction.set(docRef, finalItem, { merge: true });
+    return finalItem;
+  });
 }
 
 /**

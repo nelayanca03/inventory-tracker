@@ -18,6 +18,7 @@ import {
 import { 
   subscribeToCloudInventory, 
   saveCloudInventoryItem, 
+  saveCloudInventoryItemAtomic,
   deleteCloudInventoryItem, 
   batchSaveCloudInventory,
   subscribeToCloudSettings,
@@ -141,36 +142,118 @@ export default function App() {
     saveCloudLog(newLog).catch(console.error);
   };
 
-  // Handlers for inventory items with real-time cloud sync & logging
-  const handleSaveItem = async (item: InventoryItem) => {
+  // Handlers for inventory items with real-time cloud sync, atomic concurrency & logging
+  const handleSaveItem = async (
+    item: InventoryItem, 
+    mode: 'replace' | 'accumulate' = 'replace',
+    addedQty = 0
+  ) => {
     const existing = items.find(i => i.id === item.id);
     const index = items.findIndex(i => i.id === item.id);
+    
+    let finalItem = item;
+    if (mode === 'accumulate' && existing) {
+      const newQty = (Number(existing.qtyFisik) || 0) + addedQty;
+      finalItem = {
+        ...item,
+        qtyFisik: newQty,
+        selisih: newQty - item.qtySistem,
+        isCounted: true,
+        updatedAt: new Date().toISOString()
+      };
+    }
+
     let updated: InventoryItem[];
 
     if (index >= 0) {
       updated = [...items];
-      updated[index] = item;
-      showToast(`Data "${item.namaStok}" berhasil disimpan.`);
+      updated[index] = finalItem;
+      showToast(`Data "${finalItem.namaStok}" berhasil disimpan.`);
       // Record audit log if counted or modified
       const qtySebelum = existing ? existing.qtyFisik : 0;
-      recordInputLog(item, qtySebelum, 'input_fisik');
+      recordInputLog(finalItem, qtySebelum, 'input_fisik');
     } else {
-      updated = [item, ...items];
-      showToast(`Barang master "${item.namaStok}" berhasil ditambahkan.`);
-      recordInputLog(item, 0, 'tambah_barang');
+      updated = [finalItem, ...items];
+      showToast(`Barang master "${finalItem.namaStok}" berhasil ditambahkan.`);
+      recordInputLog(finalItem, 0, 'tambah_barang');
     }
 
     updateItems(updated);
 
-    // Push real-time to Cloud Firestore
-    saveCloudInventoryItem(item).catch(console.error);
+    // Push real-time to Cloud Firestore with atomic transaction guarantee
+    saveCloudInventoryItemAtomic(finalItem, mode, addedQty).catch((err) => {
+      console.warn('[Firebase] Atomic transaction fallback to standard save:', err);
+      saveCloudInventoryItem(finalItem).catch(console.error);
+    });
 
     // Auto-sync to Google Sheets if configured
     if (settings.autoSyncWebhook && settings.googleSheetsWebhookUrl) {
-      sendToGoogleSheetsWebhook(settings.googleSheetsWebhookUrl, item).catch(err => {
+      sendToGoogleSheetsWebhook(settings.googleSheetsWebhookUrl, finalItem).catch(err => {
         console.warn('Auto sync warning:', err);
       });
     }
+  };
+
+  const handleResetAllQtyFisik = () => {
+    if (items.length === 0) return;
+    const now = new Date().toISOString();
+    const updatedItems = items.map(item => ({
+      ...item,
+      qtyFisik: 0,
+      selisih: 0 - item.qtySistem,
+      isCounted: false,
+      updatedAt: now
+    }));
+
+    updateItems(updatedItems);
+    batchSaveCloudInventory(updatedItems, false).catch(console.error);
+
+    const logId = `log-reset-all-${Date.now()}`;
+    const resetLog: InputLog = {
+      id: logId,
+      itemId: 'ALL',
+      kodeStok: 'SEMUA_ITEM',
+      namaStok: `Kosongkan Seluruh Qty Fisik (${items.length} Barang)`,
+      namaTempat: 'Semua Lokasi',
+      qtySebelum: 0,
+      qtyFisik: 0,
+      selisih: 0,
+      satuan: 'item',
+      petugas: currentUser?.fullName || 'Admin Gudang',
+      timestamp: now,
+      actionType: 'input_fisik',
+      catatan: 'Pengosongan / reset serentak Qty Fisik seluruh hasil opname'
+    };
+    setLogs(prev => [resetLog, ...prev]);
+    saveCloudLog(resetLog).catch(console.error);
+
+    showToast(`Seluruh Qty Fisik (${items.length} barang) telah berhasil dikosongkan ke 0.`);
+  };
+
+  const handleBulkUpdateItems = (updatedItems: InventoryItem[], message: string) => {
+    updateItems(updatedItems);
+    batchSaveCloudInventory(updatedItems, false).catch(console.error);
+
+    const logId = `log-bulk-${Date.now()}`;
+    const bulkLog: InputLog = {
+      id: logId,
+      itemId: 'BULK',
+      kodeStok: 'MASAL',
+      namaStok: `Pengaturan Masal: ${message}`,
+      namaTempat: 'Masal',
+      qtySebelum: 0,
+      qtyFisik: 0,
+      selisih: 0,
+      satuan: 'item',
+      petugas: currentUser?.fullName || 'Admin Gudang',
+      timestamp: new Date().toISOString(),
+      actionType: 'input_fisik',
+      catatan: `Pengaturan serentak untuk ${updatedItems.length} barang: ${message}`
+    };
+    setLogs(prev => [bulkLog, ...prev]);
+    saveCloudLog(bulkLog).catch(console.error);
+
+    showToast(`Pengaturan masal berhasil diterapkan (${message}).`);
   };
 
   const handleDeleteItem = (id: string) => {
@@ -200,16 +283,15 @@ export default function App() {
   const handleQuickUpdateQty = (id: string, newQtyFisik: number) => {
     const target = items.find(i => i.id === id);
     if (!target) return;
-    const qtySebelum = target.qtyFisik;
     const qtyFisik = Math.max(0, newQtyFisik);
     const updatedItem: InventoryItem = {
       ...target,
       qtyFisik,
       selisih: qtyFisik - target.qtySistem,
-      isCounted: true,
+      isCounted: qtyFisik > 0,
       updatedAt: new Date().toISOString()
     };
-    handleSaveItem(updatedItem);
+    handleSaveItem(updatedItem, 'replace');
   };
 
   const handleUpdateLocations = (newLocations: string[]) => {
@@ -319,6 +401,7 @@ export default function App() {
                 onOpenPhotoLightbox={(item) => setLightboxItem(item)}
                 onSwitchToUser={() => setActiveTab('user-count')}
                 onOpenStorageModal={() => setIsStorageModalOpen(true)}
+                onBulkUpdateItems={handleBulkUpdateItems}
               />
             )}
 
@@ -358,6 +441,7 @@ export default function App() {
                 }}
                 onDelete={handleDeleteItem}
                 onQuickUpdateQty={handleQuickUpdateQty}
+                onResetAllQtyFisik={handleResetAllQtyFisik}
                 onOpenPhotoLightbox={(item) => setLightboxItem(item)}
               />
             )}

@@ -10,7 +10,9 @@ import {
   Package, 
   Clock,
   Sparkles,
-  Info
+  Info,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { InventoryItem, AppSettings, UserAccount } from '../types/inventory';
 
@@ -18,7 +20,7 @@ interface UserSimpleCountViewProps {
   currentUser: UserAccount;
   items: InventoryItem[];
   settings: AppSettings;
-  onSaveCount: (updatedItem: InventoryItem) => void;
+  onSaveCount: (updatedItem: InventoryItem, mode?: 'replace' | 'accumulate', addedQty?: number) => void;
   onOpenPhotoLightbox: (item: InventoryItem) => void;
 }
 
@@ -40,8 +42,23 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [userSessionCount, setUserSessionCount] = useState<number>(0);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Real-time track if someone else updated this item while open
+  const currentCloudItem = useMemo(() => {
+    if (!selectedItem) return null;
+    return items.find(i => i.id === selectedItem.id) || null;
+  }, [items, selectedItem]);
+
+  const wasUpdatedByOther = useMemo(() => {
+    if (!selectedItem || !currentCloudItem) return false;
+    return (
+      currentCloudItem.updatedAt !== selectedItem.updatedAt &&
+      currentCloudItem.petugas !== currentUser.fullName
+    );
+  }, [selectedItem, currentCloudItem, currentUser.fullName]);
 
   // Available locations from settings or distinct items
   const allLocations = useMemo(() => {
@@ -75,19 +92,28 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
     setQtyFisik(prev => Math.max(0, (Number(prev) || 0) + amount));
   };
 
-  const handleConfirmSubmit = () => {
-    if (!selectedItem) return;
+  const handleConfirmSubmit = async (mode: 'replace' | 'accumulate' = 'replace') => {
+    if (!selectedItem || isSubmitting) return;
 
     if (!lokasi.trim()) {
       setLocationError('Silakan pilih atau ketik lokasi rak tempat barang ini dihitung.');
       return;
     }
 
+    setIsSubmitting(true);
+    const numInput = Number(qtyFisik) || 0;
+    const baseItem = currentCloudItem || selectedItem;
+
+    let targetQty = numInput;
+    if (mode === 'accumulate') {
+      targetQty = (Number(baseItem.qtyFisik) || 0) + numInput;
+    }
+
     const updatedItem: InventoryItem = {
-      ...selectedItem,
-      qtyFisik: Number(qtyFisik) || 0,
+      ...baseItem,
+      qtyFisik: targetQty,
       namaTempat: lokasi.trim(),
-      selisih: (Number(qtyFisik) || 0) - selectedItem.qtySistem,
+      selisih: targetQty - baseItem.qtySistem,
       catatan: catatan.trim(),
       petugas: currentUser.fullName,
       isCounted: true,
@@ -95,22 +121,39 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
       updatedAt: new Date().toISOString()
     };
 
-    onSaveCount(updatedItem);
-    setUserSessionCount(prev => prev + 1);
-    setSaveSuccessNotice(`✓ Data "${selectedItem.namaStok}" berhasil disimpan: ${qtyFisik} ${selectedItem.satuan} di ${lokasi}`);
-    setSelectedItem(null);
-    setSearchTerm('');
-    setLocationError(null);
-    
-    // Auto clear success notice after 4 seconds
-    setTimeout(() => {
-      setSaveSuccessNotice(null);
-    }, 4000);
+    try {
+      await onSaveCount(updatedItem, mode, numInput);
+      setUserSessionCount(prev => prev + 1);
 
-    // Refocus search for next item
-    setTimeout(() => {
-      searchInputRef.current?.focus();
-    }, 150);
+      if (mode === 'accumulate') {
+        setSaveSuccessNotice(
+          `✓ Berhasil menambahkan +${numInput} ${selectedItem.satuan}. Total fisik terakumulasi: ${targetQty} ${selectedItem.satuan} di ${lokasi}`
+        );
+      } else {
+        setSaveSuccessNotice(
+          `✓ Data "${selectedItem.namaStok}" berhasil disimpan: ${targetQty} ${selectedItem.satuan} di ${lokasi}`
+        );
+      }
+
+      setSelectedItem(null);
+      setSearchTerm('');
+      setLocationError(null);
+      
+      // Auto clear success notice after 4 seconds
+      setTimeout(() => {
+        setSaveSuccessNotice(null);
+      }, 4000);
+
+      // Refocus search for next item
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 200);
+    } catch (err) {
+      console.error('Submit error:', err);
+      setLocationError('Gagal menyimpan data ke cloud. Silakan coba lagi.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -501,16 +544,94 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
               />
             </div>
 
-            {/* Big Action Button */}
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleConfirmSubmit}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Check className="w-5 h-5 text-white" />
-                <span>Simpan Hasil Hitung ({qtyFisik} {selectedItem.satuan})</span>
-              </button>
+            {/* Real-time Conflict Alert when another operator updated this item */}
+            {wasUpdatedByOther && (
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl flex items-start gap-3 text-amber-950 animate-in fade-in">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 text-xs">
+                  <div className="font-bold">
+                    Peringatan: Barang ini baru saja diinput oleh &quot;{currentCloudItem?.petugas}&quot;!
+                  </div>
+                  <p className="text-slate-700">
+                    Jumlah fisik saat ini di database: <strong>{currentCloudItem?.qtyFisik} {selectedItem.satuan}</strong> di <strong>{currentCloudItem?.namaTempat || 'lokasi'}</strong>.
+                  </p>
+                  <p className="text-amber-800 font-medium">
+                    Agar tidak saling menimpa, Anda dapat memilih untuk <strong>Menambahkan (Akumulasi)</strong> atau <strong>Mengganti Total</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Previous count info */}
+            {((currentCloudItem?.qtyFisik || selectedItem.qtyFisik) > 0) && !wasUpdatedByOther && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-between text-xs text-indigo-950">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    Stok fisik sebelumnya di database: <strong>{currentCloudItem?.qtyFisik || selectedItem.qtyFisik} {selectedItem.satuan}</strong> (oleh {currentCloudItem?.petugas || selectedItem.petugas})
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons (Guaranteed Concurrency & Anti Double-Submit) */}
+            <div className="pt-2 space-y-2">
+              {((currentCloudItem?.qtyFisik || selectedItem.qtyFisik) > 0) ? (
+                <>
+                  {/* Option 1: Accumulate (Best for multi-rack / multi-operator count) */}
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => handleConfirmSubmit('accumulate')}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Menyimpan ke Cloud...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-5 h-5 text-white" />
+                        <span>
+                          Tambahkan ke Stok Sebelumnya (+{qtyFisik} = {((currentCloudItem?.qtyFisik || selectedItem.qtyFisik) + (Number(qtyFisik) || 0))} {selectedItem.satuan})
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Option 2: Overwrite / Replace */}
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => handleConfirmSubmit('replace')}
+                    className="w-full py-3 bg-white hover:bg-slate-100 disabled:opacity-50 border border-slate-300 text-slate-800 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-slate-600" />
+                    <span>Ganti Nilai Total Menjadi {qtyFisik} {selectedItem.satuan}</span>
+                  </button>
+                </>
+              ) : (
+                /* Standard First-Time Save */
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleConfirmSubmit('replace')}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 active:scale-[0.99] text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Menyimpan ke Cloud...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5 text-white" />
+                      <span>Simpan Hasil Hitung ({qtyFisik} {selectedItem.satuan})</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
           </div>

@@ -50,6 +50,7 @@ import {
 } from '../services/storageService';
 import { exportInventoryToCsv, readSpreadsheetFile, parseCsvText, downloadCsvTemplate } from '../services/csvService';
 import { AdminUserVerification } from './AdminUserVerification';
+import { BulkItemSettingsModal } from './BulkItemSettingsModal';
 import { getAllUsers } from '../services/authService';
 
 interface AdminMasterManagementProps {
@@ -67,6 +68,7 @@ interface AdminMasterManagementProps {
   onOpenPhotoLightbox: (item: InventoryItem) => void;
   onSwitchToUser: () => void;
   onOpenStorageModal?: () => void;
+  onBulkUpdateItems?: (updatedItems: InventoryItem[], message: string) => void;
 }
 
 export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
@@ -83,11 +85,13 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
   onUpdateLocations,
   onOpenPhotoLightbox,
   onSwitchToUser,
-  onOpenStorageModal
+  onOpenStorageModal,
+  onBulkUpdateItems
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'barang' | 'upload-csv' | 'verifikasi-user' | 'lokasi'>('barang');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [isBulkSettingsOpen, setIsBulkSettingsOpen] = useState(false);
 
   // Search & Filter in Master Items
   const [searchQuery, setSearchQuery] = useState('');
@@ -777,6 +781,18 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+              {onBulkUpdateItems && (
+                <button
+                  type="button"
+                  onClick={() => setIsBulkSettingsOpen(true)}
+                  className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Atur lokasi, kategori, satuan, atau reset fisik untuk semua item sekaligus"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Atur Semua Item Sekaligus</span>
+                </button>
+              )}
+
               {onOpenStorageModal && (
                 <button
                   type="button"
@@ -908,13 +924,25 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                   </button>
                 </div>
 
-                <button
-                  onClick={() => setIsBulkDeleteModalOpen(true)}
-                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Hapus {selectedIds.length} Barang Terpilih</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  {onBulkUpdateItems && (
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkSettingsOpen(true)}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" />
+                      <span>Atur {selectedIds.length} Item Terpilih</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsBulkDeleteModalOpen(true)}
+                    className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus {selectedIds.length} Barang Terpilih</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2638,6 +2666,23 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Item Settings Modal */}
+      {onBulkUpdateItems && (
+        <BulkItemSettingsModal
+          isOpen={isBulkSettingsOpen}
+          onClose={() => setIsBulkSettingsOpen(false)}
+          items={items}
+          selectedIds={selectedIds}
+          locations={locations}
+          categories={categories}
+          units={INITIAL_UNITS}
+          onApplyBulkUpdate={(newItems, msg) => {
+            onBulkUpdateItems(newItems, msg);
+            setSelectedIds([]);
+          }}
+        />
       )}
 
     </div>
