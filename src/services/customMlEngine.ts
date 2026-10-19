@@ -43,6 +43,33 @@ export interface MlModelStats {
   totalPredictionsMade: number;
 }
 
+export interface IndustryTrainingPreset {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  sampleCount: number;
+  highlightTokens: string[];
+  aliases: Record<string, string>;
+  samples: Array<{
+    inputPhrase: string;
+    targetKodeStok: string;
+    targetNamaStok: string;
+    targetQty?: number;
+    targetLokasi?: string;
+    targetCatatan?: string;
+  }>;
+}
+
+export interface ItemTrainingVariation {
+  phrase: string;
+  style: 'spoken' | 'slang_abbrev' | 'code_coord' | 'notes_condition';
+  label: string;
+  suggestedQty: number;
+  suggestedLokasi: string;
+  suggestedNotes: string;
+}
+
 const STORAGE_KEY_ML_SAMPLES = 'inventrack_ml_training_samples_v1';
 const STORAGE_KEY_ML_ALIASES = 'inventrack_ml_custom_aliases_v1';
 const STORAGE_KEY_ML_AUTO_LEARN = 'inventrack_ml_auto_learn_enabled';
@@ -72,21 +99,66 @@ const INDO_NUMBER_WORDS: Record<string, number> = {
 
 // Default slang/abbreviation dictionary for warehouse
 const DEFAULT_ALIASES: Record<string, string> = {
-  lmp: 'lampu',
-  lpu: 'lampu',
-  srt: 'sorot',
-  kbl: 'kabel',
+  // Sparepart & Teknik
+  brg: 'bearing',
+  klaher: 'bearing',
+  lahar: 'bearing',
   baut: 'baut',
   btg: 'batang',
   skrup: 'sekrup',
-  saklar: 'sakelar',
-  steker: 'steker',
   fiting: 'fitting',
   ftg: 'fitting',
   solasi: 'isolasi',
   slsi: 'isolasi',
+  pipa: 'pipa',
+  rucika: 'rucika',
+
+  // Listrik & Lampu
+  lmp: 'lampu',
+  lpu: 'lampu',
+  srt: 'sorot',
+  kbl: 'kabel',
+  nym: 'nym',
+  saklar: 'sakelar',
+  steker: 'steker',
+  mcb: 'mcb',
+  sch: 'schneider',
+  phil: 'philips',
+  etn: 'eterna',
+  sup: 'supreme',
+  pan: 'panasonic',
+
+  // Elektronik & Kasir
+  skn: 'scanner',
+  scaner: 'scanner',
+  skener: 'scanner',
+  barcode: 'barcode',
+  wh: 'wireless',
+
+  // ATK & Kantor
+  krts: 'kertas',
+  hvs: 'kertas hvs',
+  paperone: 'paperone',
+  rim: 'rim',
+
+  // Packaging & Gudang
+  pck: 'packaging',
   dus: 'box',
   kardus: 'box',
+  krd: 'kardus',
+  krdus: 'kardus',
+  kraft: 'kraft',
+
+  // Safety & APD
+  sft: 'safety',
+  glv: 'sarung tangan',
+  glove: 'sarung tangan',
+  gloves: 'sarung tangan',
+  sarung: 'sarung tangan',
+  nitril: 'nitrile',
+  nbr: 'nitrile',
+
+  // Satuan & Ukuran
   biji: 'buah',
   bh: 'buah',
   pcs: 'buah',
@@ -96,30 +168,221 @@ const DEFAULT_ALIASES: Record<string, string> = {
   m: 'meter',
   kg: 'kilogram',
   gr: 'gram',
-  sch: 'schneider',
-  phil: 'philips',
-  etn: 'eterna',
-  sup: 'supreme',
-  pan: 'panasonic',
+  lt: 'lantai',
 };
 
-// Seed dataset to give the model immediate intelligence
+// Seed dataset to give the model immediate intelligence across all warehouse items
 const SEED_SAMPLES: MlTrainingSample[] = [
+  // 1. Bearing 6204 (SP-BRG-6204)
   {
-    id: 'seed-1',
-    inputPhrase: 'lampu sorot 50w rak a 20',
+    id: 'seed-brg-1',
+    inputPhrase: 'bearing 6204 service lt 1 118 pcs',
+    targetKodeStok: 'SP-BRG-6204',
+    targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+    targetQty: 118,
+    targetLokasi: 'SERVICE LT 1',
+    targetCatatan: 'Kondisi baik',
+    source: 'seed',
+    confidence: 0.98,
+    learnedAt: new Date().toISOString(),
+    hitCount: 8,
+  },
+  {
+    id: 'seed-brg-2',
+    inputPhrase: 'brg 6204 klaher 120 service lt 1',
+    targetKodeStok: 'SP-BRG-6204',
+    targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+    targetQty: 120,
+    targetLokasi: 'SERVICE LT 1',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.96,
+    learnedAt: new Date().toISOString(),
+    hitCount: 6,
+  },
+  {
+    id: 'seed-brg-3',
+    inputPhrase: 'lahar 6204 ada 118 di service lantai 1',
+    targetKodeStok: 'SP-BRG-6204',
+    targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+    targetQty: 118,
+    targetLokasi: 'SERVICE LT 1',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.97,
+    learnedAt: new Date().toISOString(),
+    hitCount: 4,
+  },
+
+  // 2. Barcode Scanner (EL-SCN-2900)
+  {
+    id: 'seed-scn-1',
+    inputPhrase: 'barcode scanner kasir 15 unit',
+    targetKodeStok: 'EL-SCN-2900',
+    targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+    targetQty: 15,
+    targetLokasi: 'KASIR',
+    targetCatatan: 'Normal',
+    source: 'seed',
+    confidence: 0.98,
+    learnedAt: new Date().toISOString(),
+    hitCount: 7,
+  },
+  {
+    id: 'seed-scn-2',
+    inputPhrase: 'scaner 2d wireless ada lima belas di kasir',
+    targetKodeStok: 'EL-SCN-2900',
+    targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+    targetQty: 15,
+    targetLokasi: 'KASIR',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.97,
+    learnedAt: new Date().toISOString(),
+    hitCount: 5,
+  },
+  {
+    id: 'seed-scn-3',
+    inputPhrase: 'alat scan barcode 2900 kasir lengkap',
+    targetKodeStok: 'EL-SCN-2900',
+    targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+    targetQty: 15,
+    targetLokasi: 'KASIR',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.95,
+    learnedAt: new Date().toISOString(),
+    hitCount: 3,
+  },
+
+  // 3. Kertas HVS (ATK-KRT-A480)
+  {
+    id: 'seed-atk-1',
+    inputPhrase: 'kertas hvs paperone a4 54 dus service lt 2',
+    targetKodeStok: 'ATK-KRT-A480',
+    targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+    targetQty: 54,
+    targetLokasi: 'SERVICE LT 2',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.98,
+    learnedAt: new Date().toISOString(),
+    hitCount: 7,
+  },
+  {
+    id: 'seed-atk-2',
+    inputPhrase: 'hvs a4 80gsm 50 dus ada di service lantai 2',
+    targetKodeStok: 'ATK-KRT-A480',
+    targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+    targetQty: 50,
+    targetLokasi: 'SERVICE LT 2',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.96,
+    learnedAt: new Date().toISOString(),
+    hitCount: 4,
+  },
+  {
+    id: 'seed-atk-3',
+    inputPhrase: 'paper one hvs 5 rim dapat 54 box',
+    targetKodeStok: 'ATK-KRT-A480',
+    targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+    targetQty: 54,
+    targetLokasi: 'SERVICE LT 2',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.95,
+    learnedAt: new Date().toISOString(),
+    hitCount: 3,
+  },
+
+  // 4. Kardus Box Master Kraft (PCK-KRD-4030)
+  {
+    id: 'seed-pck-1',
+    inputPhrase: 'kardus box master kraft 290 pcs dapur lt 1',
+    targetKodeStok: 'PCK-KRD-4030',
+    targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+    targetQty: 290,
+    targetLokasi: 'DAPUR LT 1',
+    targetCatatan: '10 basah kena tetesan air',
+    source: 'seed',
+    confidence: 0.98,
+    learnedAt: new Date().toISOString(),
+    hitCount: 6,
+  },
+  {
+    id: 'seed-pck-2',
+    inputPhrase: 'box kraft 40x30 double wall dapur 300 lembar',
+    targetKodeStok: 'PCK-KRD-4030',
+    targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+    targetQty: 300,
+    targetLokasi: 'DAPUR LT 1',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.96,
+    learnedAt: new Date().toISOString(),
+    hitCount: 4,
+  },
+
+  // 5. Sarung Tangan Nitrile (SFT-GLV-NBR9)
+  {
+    id: 'seed-sft-1',
+    inputPhrase: 'sarung tangan nitrile heavy duty 85 box bar',
+    targetKodeStok: 'SFT-GLV-NBR9',
+    targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+    targetQty: 85,
+    targetLokasi: 'BAR',
+    targetCatatan: 'Segel rapi',
+    source: 'seed',
+    confidence: 0.98,
+    learnedAt: new Date().toISOString(),
+    hitCount: 6,
+  },
+  {
+    id: 'seed-sft-2',
+    inputPhrase: 'gloves nitril size l ada delapan puluh lima di bar',
+    targetKodeStok: 'SFT-GLV-NBR9',
+    targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+    targetQty: 85,
+    targetLokasi: 'BAR',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.96,
+    learnedAt: new Date().toISOString(),
+    hitCount: 4,
+  },
+
+  // 6. Lampu Sorot LED 50W (STO1901)
+  {
+    id: 'seed-sto-1',
+    inputPhrase: 'lampu sorot 50w rak a 20 pcs',
     targetKodeStok: 'STO1901',
     targetNamaStok: 'Lampu Sorot LED 50W',
     targetQty: 20,
     targetLokasi: 'Rak A',
     targetCatatan: '',
     source: 'seed',
-    confidence: 0.95,
+    confidence: 0.98,
     learnedAt: new Date().toISOString(),
     hitCount: 5,
   },
   {
-    id: 'seed-2',
+    id: 'seed-sto-1b',
+    inputPhrase: 'lmp sorot led 50 watt ada 20 di rak a',
+    targetKodeStok: 'STO1901',
+    targetNamaStok: 'Lampu Sorot LED 50W',
+    targetQty: 20,
+    targetLokasi: 'Rak A',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.97,
+    learnedAt: new Date().toISOString(),
+    hitCount: 4,
+  },
+
+  // 7. Kabel Eterna NYM 2x1.5mm (STO1902)
+  {
+    id: 'seed-sto-2',
     inputPhrase: 'kabel eterna 2x1.5 roll b1 15',
     targetKodeStok: 'STO1902',
     targetNamaStok: 'Kabel Eterna NYM 2x1.5mm',
@@ -127,12 +390,27 @@ const SEED_SAMPLES: MlTrainingSample[] = [
     targetLokasi: 'Rak B1',
     targetCatatan: '',
     source: 'seed',
-    confidence: 0.95,
+    confidence: 0.98,
     learnedAt: new Date().toISOString(),
-    hitCount: 4,
+    hitCount: 5,
   },
   {
-    id: 'seed-3',
+    id: 'seed-sto-2b',
+    inputPhrase: 'kbl eterna nym 2x1.5mm 15 roll rak b1',
+    targetKodeStok: 'STO1902',
+    targetNamaStok: 'Kabel Eterna NYM 2x1.5mm',
+    targetQty: 15,
+    targetLokasi: 'Rak B1',
+    targetCatatan: '',
+    source: 'seed',
+    confidence: 0.96,
+    learnedAt: new Date().toISOString(),
+    hitCount: 3,
+  },
+
+  // 8. MCB Schneider 16A 1P (STO1903)
+  {
+    id: 'seed-sto-3',
     inputPhrase: 'mcb schneider 16a ada 30 rak c2',
     targetKodeStok: 'STO1903',
     targetNamaStok: 'MCB Schneider 16A 1P',
@@ -140,12 +418,14 @@ const SEED_SAMPLES: MlTrainingSample[] = [
     targetLokasi: 'Rak C2',
     targetCatatan: '',
     source: 'seed',
-    confidence: 0.96,
+    confidence: 0.98,
     learnedAt: new Date().toISOString(),
-    hitCount: 3,
+    hitCount: 5,
   },
+
+  // 9. Pipa PVC Rucika AW 1/2 inch (STO1904)
   {
-    id: 'seed-4',
+    id: 'seed-sto-4',
     inputPhrase: 'pipa pvc 1/2 aw 50 batang rak d',
     targetKodeStok: 'STO1904',
     targetNamaStok: 'Pipa PVC Rucika AW 1/2 inch',
@@ -153,10 +433,383 @@ const SEED_SAMPLES: MlTrainingSample[] = [
     targetLokasi: 'Rak D',
     targetCatatan: '',
     source: 'seed',
-    confidence: 0.95,
+    confidence: 0.98,
     learnedAt: new Date().toISOString(),
-    hitCount: 2,
+    hitCount: 4,
   },
+];
+
+export const PRESET_INDUSTRY_DATASETS: IndustryTrainingPreset[] = [
+  {
+    id: 'preset-teknik',
+    name: 'Teknik Mesin & Sparepart',
+    category: 'Sparepart Mesin',
+    description: 'Data latih untuk bearing/lahar/klaher, baut baja, seal o-ring, v-belt, pipa PVC rucika, valve',
+    sampleCount: 8,
+    highlightTokens: ['brg', 'klaher', 'lahar', 'baut', 'seal', 'rucika', 'v-belt', 'btg'],
+    aliases: {
+      brg: 'bearing',
+      klaher: 'bearing',
+      lahar: 'bearing',
+      skrup: 'sekrup',
+      ftg: 'fitting',
+      btg: 'batang'
+    },
+    samples: [
+      {
+        inputPhrase: 'brg 6204 klaher 118 service lt 1',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 118,
+        targetLokasi: 'SERVICE LT 1',
+        targetCatatan: 'Kondisi baik'
+      },
+      {
+        inputPhrase: 'bearing deep groove 6204 120 pcs service lt 1',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 120,
+        targetLokasi: 'SERVICE LT 1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'lahar 6204 ada 118 di service lantai 1',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 118,
+        targetLokasi: 'SERVICE LT 1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'sp-brg-6204 118 pcs di service lt 1 kondisi bagus',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 118,
+        targetLokasi: 'SERVICE LT 1',
+        targetCatatan: 'Kondisi bagus'
+      },
+      {
+        inputPhrase: 'pipa pvc 1/2 aw 50 batang rak d',
+        targetKodeStok: 'STO1904',
+        targetNamaStok: 'Pipa PVC Rucika AW 1/2 inch',
+        targetQty: 50,
+        targetLokasi: 'Rak D',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'pipa rucika aw 1/2 inch ada 50 btg di rak d',
+        targetKodeStok: 'STO1904',
+        targetNamaStok: 'Pipa PVC Rucika AW 1/2 inch',
+        targetQty: 50,
+        targetLokasi: 'Rak D',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'baut baja m10x50 500 pcs rak c3',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 500,
+        targetLokasi: 'Rak C3',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'seal o-ring nbr 70 80 pcs rak d1',
+        targetKodeStok: 'SP-BRG-6204',
+        targetNamaStok: 'Bearing Deep Groove 6204 2RS C3',
+        targetQty: 80,
+        targetLokasi: 'Rak D1',
+        targetCatatan: ''
+      }
+    ]
+  },
+  {
+    id: 'preset-listrik',
+    name: 'Elektrikal, Lampu & Kabel',
+    category: 'Elektronik & Alat',
+    description: 'Data latih kabel NYM eterna, lampu sorot LED 50W, MCB Schneider, stop kontak, steker',
+    sampleCount: 8,
+    highlightTokens: ['kbl', 'eterna', 'nym', 'lmp', 'sorot', 'mcb', 'schneider', 'roll'],
+    aliases: {
+      lmp: 'lampu',
+      lpu: 'lampu',
+      srt: 'sorot',
+      kbl: 'kabel',
+      sch: 'schneider',
+      pan: 'panasonic'
+    },
+    samples: [
+      {
+        inputPhrase: 'kbl eterna 2x1.5 roll b1 15',
+        targetKodeStok: 'STO1902',
+        targetNamaStok: 'Kabel Eterna NYM 2x1.5mm',
+        targetQty: 15,
+        targetLokasi: 'Rak B1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'kabel eterna nym 2x1.5mm 15 roll rak b1',
+        targetKodeStok: 'STO1902',
+        targetNamaStok: 'Kabel Eterna NYM 2x1.5mm',
+        targetQty: 15,
+        targetLokasi: 'Rak B1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'eterna nym 2x1.5 ada lima belas roll di rak b1',
+        targetKodeStok: 'STO1902',
+        targetNamaStok: 'Kabel Eterna NYM 2x1.5mm',
+        targetQty: 15,
+        targetLokasi: 'Rak B1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'lampu sorot 50w rak a 20 pcs',
+        targetKodeStok: 'STO1901',
+        targetNamaStok: 'Lampu Sorot LED 50W',
+        targetQty: 20,
+        targetLokasi: 'Rak A',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'lmp sorot led 50 watt ada 20 di rak a',
+        targetKodeStok: 'STO1901',
+        targetNamaStok: 'Lampu Sorot LED 50W',
+        targetQty: 20,
+        targetLokasi: 'Rak A',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'mcb schneider 16a ada 30 rak c2',
+        targetKodeStok: 'STO1903',
+        targetNamaStok: 'MCB Schneider 16A 1P',
+        targetQty: 30,
+        targetLokasi: 'Rak C2',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'schneider 16a 1p tiga puluh unit rak c2 normal',
+        targetKodeStok: 'STO1903',
+        targetNamaStok: 'MCB Schneider 16A 1P',
+        targetQty: 30,
+        targetLokasi: 'Rak C2',
+        targetCatatan: 'Normal'
+      },
+      {
+        inputPhrase: 'saklar panasonic wide series 40 pcs',
+        targetKodeStok: 'STO1903',
+        targetNamaStok: 'MCB Schneider 16A 1P',
+        targetQty: 40,
+        targetLokasi: 'Rak C2',
+        targetCatatan: ''
+      }
+    ]
+  },
+  {
+    id: 'preset-kantor',
+    name: 'ATK, Kertas & Kasir',
+    category: 'ATK & Perlengkapan Kantor',
+    description: 'Data latih kertas HVS A4 80gr, rim/dus, barcode scanner handheld 2D wireless, ordner, map',
+    sampleCount: 7,
+    highlightTokens: ['hvs', 'paperone', 'krts', 'skn', 'scaner', 'barcode', 'rim', 'dus'],
+    aliases: {
+      hvs: 'kertas hvs',
+      krts: 'kertas',
+      skn: 'scanner',
+      scaner: 'scanner',
+      skener: 'scanner',
+      barcode: 'barcode',
+      rim: 'rim'
+    },
+    samples: [
+      {
+        inputPhrase: 'kertas hvs paperone a4 54 dus service lt 2',
+        targetKodeStok: 'ATK-KRT-A480',
+        targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+        targetQty: 54,
+        targetLokasi: 'SERVICE LT 2',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'hvs a4 80gsm 50 dus ada di service lantai 2',
+        targetKodeStok: 'ATK-KRT-A480',
+        targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+        targetQty: 50,
+        targetLokasi: 'SERVICE LT 2',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'paper one hvs 5 rim dapat 54 box',
+        targetKodeStok: 'ATK-KRT-A480',
+        targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+        targetQty: 54,
+        targetLokasi: 'SERVICE LT 2',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'barcode scanner kasir 15 unit',
+        targetKodeStok: 'EL-SCN-2900',
+        targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+        targetQty: 15,
+        targetLokasi: 'KASIR',
+        targetCatatan: 'Normal'
+      },
+      {
+        inputPhrase: 'scaner 2d wireless ada lima belas di kasir',
+        targetKodeStok: 'EL-SCN-2900',
+        targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+        targetQty: 15,
+        targetLokasi: 'KASIR',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'alat scan barcode 2900 kasir lengkap',
+        targetKodeStok: 'EL-SCN-2900',
+        targetNamaStok: 'Barcode Scanner Handheld 2D Wireless',
+        targetQty: 15,
+        targetLokasi: 'KASIR',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'spidol whiteboard snowman hitam 80 pcs',
+        targetKodeStok: 'ATK-KRT-A480',
+        targetNamaStok: 'Kertas HVS PaperOne A4 80gsm 5 Rim',
+        targetQty: 80,
+        targetLokasi: 'KASIR',
+        targetCatatan: ''
+      }
+    ]
+  },
+  {
+    id: 'preset-packaging',
+    name: 'Gudang & Kemasan Karton',
+    category: 'Packaging & Kardus',
+    description: 'Data latih kardus master kraft double wall, lakban coklat/bening, bubble wrap, plastik wrap',
+    sampleCount: 6,
+    highlightTokens: ['krd', 'kardus', 'box', 'kraft', 'dus', 'lakban', 'double wall'],
+    aliases: {
+      krd: 'kardus',
+      krdus: 'kardus',
+      dus: 'box',
+      kraft: 'kraft',
+      lakban: 'isolasi'
+    },
+    samples: [
+      {
+        inputPhrase: 'kardus box master kraft 290 pcs dapur lt 1',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 290,
+        targetLokasi: 'DAPUR LT 1',
+        targetCatatan: '10 basah kena tetesan air'
+      },
+      {
+        inputPhrase: 'box kraft 40x30 double wall dapur 300 lembar',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 300,
+        targetLokasi: 'DAPUR LT 1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'krd master kraft 40x30 ada 290 dapur lantai 1',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 290,
+        targetLokasi: 'DAPUR LT 1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'lakban bening daimaru 48mm 72 roll dapur lt 2',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 72,
+        targetLokasi: 'DAPUR LT 2',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'bubble wrap 50 meter 12 roll gudang',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 12,
+        targetLokasi: 'DAPUR LT 1',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'stretch film plastik wrapping 20 roll',
+        targetKodeStok: 'PCK-KRD-4030',
+        targetNamaStok: 'Kardus Box Master Kraft 40x30x25 Double Wall',
+        targetQty: 20,
+        targetLokasi: 'DAPUR LT 1',
+        targetCatatan: ''
+      }
+    ]
+  },
+  {
+    id: 'preset-apd',
+    name: 'Safety & Perlengkapan APD',
+    category: 'Perlengkapan Safety / APD',
+    description: 'Data latih sarung tangan nitrile heavy duty, helm safety proyek, rompi scotlight, kacamata',
+    sampleCount: 6,
+    highlightTokens: ['gloves', 'glv', 'nitril', 'nbr', 'safety', 'helm', 'rompi', 'goggle'],
+    aliases: {
+      glv: 'sarung tangan',
+      glove: 'sarung tangan',
+      gloves: 'sarung tangan',
+      nitril: 'nitrile',
+      nbr: 'nitrile',
+      sft: 'safety'
+    },
+    samples: [
+      {
+        inputPhrase: 'sarung tangan nitrile heavy duty 85 box bar',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 85,
+        targetLokasi: 'BAR',
+        targetCatatan: 'Segel rapi'
+      },
+      {
+        inputPhrase: 'gloves nitril size l ada delapan puluh lima di bar',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 85,
+        targetLokasi: 'BAR',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'sft glv nbr 9 bar 85 box kondisi utuh',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 85,
+        targetLokasi: 'BAR',
+        targetCatatan: 'Kondisi utuh'
+      },
+      {
+        inputPhrase: 'helm proyek safety v-gard putih 30 unit bar',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 30,
+        targetLokasi: 'BAR',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'rompi safety scotlight hijau 45 pcs bar',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 45,
+        targetLokasi: 'BAR',
+        targetCatatan: ''
+      },
+      {
+        inputPhrase: 'kacamata safety goggle bening 60 pcs',
+        targetKodeStok: 'SFT-GLV-NBR9',
+        targetNamaStok: 'Sarung Tangan Nitrile Heavy Duty Size L',
+        targetQty: 60,
+        targetLokasi: 'BAR',
+        targetCatatan: ''
+      }
+    ]
+  }
 ];
 
 class CustomMlEngine {
@@ -372,6 +1025,151 @@ class CustomMlEngine {
       targetLokasi: location || item.namaTempat || '',
       source: 'auto_learned',
     });
+  }
+
+  /**
+   * Get all curated industry presets
+   */
+  public getIndustryPresets(): IndustryTrainingPreset[] {
+    return PRESET_INDUSTRY_DATASETS;
+  }
+
+  /**
+   * Load an industry preset and immediately train the model with its samples and slang
+   */
+  public loadIndustryPreset(
+    presetId: string,
+    currentItems: InventoryItem[]
+  ): { success: boolean; addedCount: number; message: string } {
+    const preset = PRESET_INDUSTRY_DATASETS.find(p => p.id === presetId);
+    if (!preset) {
+      return { success: false, addedCount: 0, message: 'Paket data latih tidak ditemukan' };
+    }
+
+    // Merge preset aliases
+    if (preset.aliases) {
+      this.aliases = { ...this.aliases, ...preset.aliases };
+      this.saveAliases();
+    }
+
+    let added = 0;
+    for (const s of preset.samples) {
+      // Find matching item in current catalog if possible
+      const matched = currentItems.find(
+        i =>
+          i.kodeStok.toLowerCase() === s.targetKodeStok.toLowerCase() ||
+          i.namaStok.toLowerCase().includes(s.targetNamaStok.toLowerCase().slice(0, 10))
+      );
+
+      this.trainModel({
+        inputPhrase: s.inputPhrase,
+        targetKodeStok: matched ? matched.kodeStok : s.targetKodeStok,
+        targetNamaStok: matched ? matched.namaStok : s.targetNamaStok,
+        targetQty: s.targetQty !== undefined ? s.targetQty : (matched?.qtyFisik || matched?.qtySistem || 10),
+        targetLokasi: s.targetLokasi || (matched?.namaTempat || 'Rak Utama'),
+        targetCatatan: s.targetCatatan || (matched?.catatan || ''),
+        source: 'manual_training',
+      });
+      added++;
+    }
+
+    return {
+      success: true,
+      addedCount: added,
+      message: `Berhasil memuat & melatih ${added} variasi pola untuk paket ${preset.name}!`,
+    };
+  }
+
+  /**
+   * Generate 4 realistic variations for any item (abbreviation, voice/spoken, code coord, condition)
+   */
+  public generateItemTrainingVariations(
+    item: InventoryItem,
+    availableLocations: string[] = []
+  ): ItemTrainingVariation[] {
+    const loc = item.namaTempat || (availableLocations[0] || 'Rak A');
+    const qty =
+      item.qtyFisik !== undefined && item.qtyFisik !== null ? item.qtyFisik : (item.qtySistem || 10);
+    const satuan = item.satuan || 'pcs';
+    const cleanName = item.namaStok.replace(/[\(\)\[\]]/g, '').trim();
+    const words = cleanName.split(/\s+/);
+    const shortName = words.slice(0, Math.min(3, words.length)).join(' ');
+
+    // Derive slang version if item name contains recognized full terms
+    let slangName = shortName;
+    for (const [alias, full] of Object.entries(this.aliases)) {
+      if (cleanName.toLowerCase().includes(full.toLowerCase())) {
+        slangName = cleanName.toLowerCase().replace(full.toLowerCase(), alias);
+        break;
+      }
+    }
+
+    return [
+      {
+        style: 'slang_abbrev',
+        label: 'Singkatan Cepat Gudang',
+        phrase: `${slangName.toLowerCase()} ${qty} ${loc.toLowerCase()}`,
+        suggestedQty: qty,
+        suggestedLokasi: loc,
+        suggestedNotes: item.kondisi || 'Baik',
+      },
+      {
+        style: 'code_coord',
+        label: 'Kode Stok & Lokasi Rak',
+        phrase: `${item.kodeStok.toLowerCase()} ada ${qty} ${satuan.toLowerCase()} di ${loc.toLowerCase()}`,
+        suggestedQty: qty,
+        suggestedLokasi: loc,
+        suggestedNotes: '',
+      },
+      {
+        style: 'spoken',
+        label: 'Gaya Suara / Percakapan Operator',
+        phrase: `tolong catat ${shortName.toLowerCase()} dapat ${qty} ${satuan.toLowerCase()} di ${loc.toLowerCase()}`,
+        suggestedQty: qty,
+        suggestedLokasi: loc,
+        suggestedNotes: '',
+      },
+      {
+        style: 'notes_condition',
+        label: 'Kondisi Fisik / Catatan Khusus',
+        phrase: `${shortName.toLowerCase()} ${qty} ${loc.toLowerCase()} kondisi ${item.kondisi?.toLowerCase() || 'baik'}`,
+        suggestedQty: qty,
+        suggestedLokasi: loc,
+        suggestedNotes: item.catatan || `Kondisi ${item.kondisi || 'Baik'}`,
+      },
+    ];
+  }
+
+  /**
+   * Batch train all items in the inventory catalog automatically
+   */
+  public batchTrainAllItems(
+    items: InventoryItem[],
+    availableLocations: string[] = []
+  ): { totalGenerated: number; itemsTrained: number } {
+    if (!items || items.length === 0) return { totalGenerated: 0, itemsTrained: 0 };
+
+    let totalGen = 0;
+    for (const item of items) {
+      const vars = this.generateItemTrainingVariations(item, availableLocations);
+      for (const v of vars) {
+        this.trainModel({
+          inputPhrase: v.phrase,
+          targetKodeStok: item.kodeStok,
+          targetNamaStok: item.namaStok,
+          targetQty: v.suggestedQty,
+          targetLokasi: v.suggestedLokasi,
+          targetCatatan: v.suggestedNotes,
+          source: 'manual_training',
+        });
+        totalGen++;
+      }
+    }
+
+    return {
+      totalGenerated: totalGen,
+      itemsTrained: items.length,
+    };
   }
 
   // --- NLP & FEATURE EXTRACTION PIPELINE ---

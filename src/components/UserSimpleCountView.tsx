@@ -238,11 +238,14 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenMlStudio}
-                  title="Buka Studio Machine Learning & Latih Model Sendiri"
+                  title="Buka Studio Machine Learning & Latih Model Otomatis"
                   className="flex-1 sm:flex-initial px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95"
                 >
                   <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Studio ML</span>
+                  <span className="px-1.5 py-0.5 text-[9px] bg-indigo-600 text-white rounded-md font-extrabold uppercase shadow-2xs">
+                    Latih
+                  </span>
                 </button>
               )}
               <button
@@ -350,10 +353,22 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
           {searchTerm.trim() && (
             <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-white shadow-md">
               {searchResults.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs space-y-1">
+                <div className="p-8 text-center text-slate-500 text-xs space-y-2">
                   <Package className="w-8 h-8 text-slate-300 mx-auto" />
                   <div className="font-semibold text-slate-700">Barang &quot;{searchTerm}&quot; tidak ditemukan</div>
                   <p className="text-[11px] text-slate-400">Pastikan ejaan nama atau kode stok sudah sesuai.</p>
+                  {onOpenMlStudio && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={onOpenMlStudio}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+                      >
+                        <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Ajari Model ML Frasa Ini di Studio</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 searchResults.map(item => (

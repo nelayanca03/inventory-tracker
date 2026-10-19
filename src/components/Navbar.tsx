@@ -154,11 +154,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenMlStudio}
-                title="Buka Studio Machine Learning (Latih Model & Uji Coba Input)"
+                title="Buka Studio Machine Learning & Latih Model Otomatis"
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all shadow-2xs active:scale-95"
               >
                 <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
                 <span className="hidden sm:inline">Studio ML</span>
+                <span className="hidden md:inline px-1.5 py-0.2 text-[9px] bg-indigo-600 text-white rounded font-extrabold uppercase">
+                  Latih
+                </span>
               </button>
             )}
 

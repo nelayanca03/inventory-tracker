@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   BrainCircuit,
   Sparkles,
@@ -21,6 +21,14 @@ import {
   FileText,
   Sliders,
   Check,
+  Wand2,
+  Rocket,
+  Layers,
+  ChevronRight,
+  Play,
+  Cpu,
+  Package,
+  Bot,
 } from 'lucide-react';
 import { InventoryItem } from '../types/inventory';
 import {
@@ -28,6 +36,8 @@ import {
   MlPredictionResult,
   MlTrainingSample,
   MlModelStats,
+  IndustryTrainingPreset,
+  ItemTrainingVariation,
 } from '../services/customMlEngine';
 
 interface CustomMlStudioModalProps {
@@ -35,6 +45,7 @@ interface CustomMlStudioModalProps {
   onClose: () => void;
   items: InventoryItem[];
   availableLocations?: string[];
+  initialTab?: 'assistant' | 'test' | 'train' | 'dataset' | 'aliases';
   onApplyPrediction?: (prediction: {
     matchedItem: InventoryItem;
     qtyFisik: number | null;
@@ -48,9 +59,10 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
   onClose,
   items,
   availableLocations = [],
+  initialTab = 'assistant',
   onApplyPrediction,
 }) => {
-  const [activeTab, setActiveTab] = useState<'test' | 'train' | 'dataset' | 'aliases'>('test');
+  const [activeTab, setActiveTab] = useState<'assistant' | 'test' | 'train' | 'dataset' | 'aliases'>(initialTab);
 
   // Testing sandbox state
   const [testInput, setTestInput] = useState<string>('lampu sorot 50w b3 20');
@@ -76,6 +88,14 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
   const [datasetSearch, setDatasetSearch] = useState<string>('');
   const [jsonNotice, setJsonNotice] = useState<string | null>(null);
 
+  // Assistant / Auto-trainer states
+  const [isBatchTraining, setIsBatchTraining] = useState<boolean>(false);
+  const [batchTrainSuccess, setBatchTrainSuccess] = useState<{ total: number; count: number } | null>(null);
+  const [assistantSelectedItemCode, setAssistantSelectedItemCode] = useState<string>('');
+  const [loadedPresetId, setLoadedPresetId] = useState<string | null>(null);
+
+  const presets = useMemo(() => customMlEngine.getIndustryPresets(), []);
+
   // Refresh stats
   const refreshEngineState = () => {
     setStats(customMlEngine.getStats());
@@ -97,13 +117,85 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       refreshEngineState();
+      setActiveTab(initialTab);
       if (!selectedItemCode && items.length > 0) {
         setSelectedItemCode(items[0].kodeStok);
       }
+      if (!assistantSelectedItemCode && items.length > 0) {
+        setAssistantSelectedItemCode(items[0].kodeStok);
+      }
     }
-  }, [isOpen, items]);
+  }, [isOpen, items, initialTab]);
 
   if (!isOpen) return null;
+
+  // Selected item for interactive assistant
+  const assistantSelectedItem = items.find(i => i.kodeStok === assistantSelectedItemCode) || items[0];
+
+  // Generated variations for selected item
+  const currentVariations: ItemTrainingVariation[] = assistantSelectedItem
+    ? customMlEngine.generateItemTrainingVariations(assistantSelectedItem, availableLocations)
+    : [];
+
+  // Handle 1-Click Batch Auto-Train All Items
+  const handleBatchTrainAll = () => {
+    setIsBatchTraining(true);
+    setTimeout(() => {
+      const res = customMlEngine.batchTrainAllItems(items, availableLocations);
+      refreshEngineState();
+      setIsBatchTraining(false);
+      setBatchTrainSuccess({ total: res.totalGenerated, count: res.itemsTrained });
+      setJsonNotice(`🎉 Berhasil melatih model! ${res.totalGenerated} variasi data latih baru telah dipelajari untuk seluruh ${res.itemsTrained} barang.`);
+      setTimeout(() => setJsonNotice(null), 5000);
+    }, 500);
+  };
+
+  // Handle Load Industry Preset
+  const handleLoadPreset = (presetId: string) => {
+    const res = customMlEngine.loadIndustryPreset(presetId, items);
+    refreshEngineState();
+    if (res.success) {
+      setLoadedPresetId(presetId);
+      setJsonNotice(res.message);
+      setTimeout(() => {
+        setJsonNotice(null);
+      }, 4000);
+    }
+  };
+
+  // Handle Train Single Variation from Assistant
+  const handleTrainSingleVariation = (v: ItemTrainingVariation, targetItem: InventoryItem) => {
+    customMlEngine.trainModel({
+      inputPhrase: v.phrase,
+      targetKodeStok: targetItem.kodeStok,
+      targetNamaStok: targetItem.namaStok,
+      targetQty: v.suggestedQty,
+      targetLokasi: v.suggestedLokasi,
+      targetCatatan: v.suggestedNotes,
+      source: 'manual_training',
+    });
+    refreshEngineState();
+    setJsonNotice(`✓ Pola "${v.phrase}" berhasil dilatihkan ke model.`);
+    setTimeout(() => setJsonNotice(null), 3000);
+  };
+
+  // Handle Train All 4 Variations for Selected Item
+  const handleTrainAllVariationsForItem = (targetItem: InventoryItem, variations: ItemTrainingVariation[]) => {
+    for (const v of variations) {
+      customMlEngine.trainModel({
+        inputPhrase: v.phrase,
+        targetKodeStok: targetItem.kodeStok,
+        targetNamaStok: targetItem.namaStok,
+        targetQty: v.suggestedQty,
+        targetLokasi: v.suggestedLokasi,
+        targetCatatan: v.suggestedNotes,
+        source: 'manual_training',
+      });
+    }
+    refreshEngineState();
+    setJsonNotice(`✨ 4 variasi pola untuk "${targetItem.namaStok}" berhasil dilatihkan ke model!`);
+    setTimeout(() => setJsonNotice(null), 3500);
+  };
 
   // Handle Training form submit
   const handleTrainSubmit = (e: React.FormEvent) => {
@@ -215,7 +307,7 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-4xl max-h-[92vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+      <div className="bg-white w-full max-w-4xl max-h-[94vh] rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
         
         {/* Header */}
         <div className="px-6 py-4 bg-linear-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-indigo-900/50">
@@ -276,69 +368,370 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
 
         {/* Notice Message */}
         {jsonNotice && (
-          <div className="mx-6 mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-medium flex items-center gap-2">
+          <div className="mx-6 mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-medium flex items-center gap-2 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{jsonNotice}</span>
           </div>
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 px-6 gap-2 bg-white">
+        <div className="flex border-b border-slate-200 px-6 gap-1 bg-white overflow-x-auto">
+          {/* TAB 0: ASSISTANT (BANTU TRAINING) */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('assistant')}
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'assistant'
+                ? 'border-indigo-600 text-indigo-700 bg-indigo-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Wand2 className="w-3.5 h-3.5 text-indigo-600" />
+            <span>1. Asisten Bantu Training</span>
+            <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide bg-linear-to-r from-amber-500 to-indigo-600 text-white rounded-md shadow-2xs">
+              Cepat
+            </span>
+          </button>
+
+          {/* TAB 1: TEST / SANDBOX */}
           <button
             type="button"
             onClick={() => setActiveTab('test')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
               activeTab === 'test'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Zap className="w-3.5 h-3.5" />
-            <span>1. Uji Coba Input (Sandbox)</span>
+            <Zap className="w-3.5 h-3.5 text-amber-500" />
+            <span>2. Uji Coba Input (Sandbox)</span>
           </button>
 
+          {/* TAB 2: TRAIN MANUAL */}
           <button
             type="button"
             onClick={() => setActiveTab('train')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
               activeTab === 'train'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>2. Ajari Mesin (Tambah Data Latih)</span>
+            <span>3. Ajari Manual Satu-satu</span>
           </button>
 
+          {/* TAB 3: DATASET */}
           <button
             type="button"
             onClick={() => setActiveTab('dataset')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
               activeTab === 'dataset'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>3. Memori Data Latih ({samples.length})</span>
+            <span>4. Memori Data ({samples.length})</span>
           </button>
 
+          {/* TAB 4: ALIASES */}
           <button
             type="button"
             onClick={() => setActiveTab('aliases')}
-            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+            className={`py-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 shrink-0 ${
               activeTab === 'aliases'
                 ? 'border-indigo-600 text-indigo-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
-            <span>4. Kamus Singkatan ({Object.keys(aliases).length})</span>
+            <span>5. Kamus Singkatan ({Object.keys(aliases).length})</span>
           </button>
         </div>
 
         {/* Tab Body Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+          {/* TAB 0: ASISTEN BANTU TRAINING */}
+          {activeTab === 'assistant' && (
+            <div className="space-y-6">
+              
+              {/* Header Card */}
+              <div className="p-5 bg-linear-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white rounded-2xl shadow-md border border-indigo-700 relative overflow-hidden">
+                <div className="relative z-10 space-y-2">
+                  <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-white/10 backdrop-blur-md rounded-lg text-xs font-bold text-amber-300 border border-white/20">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Solusi Cepat Pelatihan Model ML</span>
+                  </div>
+                  <h3 className="text-lg font-extrabold tracking-tight">
+                    Bantu Pelatihan Otomatis (Auto-Training Machine Learning)
+                  </h3>
+                  <p className="text-xs text-indigo-200 max-w-2xl leading-relaxed">
+                    Anda tidak perlu mengetik ratusan data satu per satu secara manual. Gunakan asisten ini untuk <strong>melatih seluruh barang di database dalam 1-klik</strong>, memasang <strong>paket dataset industri siap pakai</strong>, atau <strong>melatih variasi cerdas per barang</strong>.
+                  </p>
+                </div>
+                <div className="absolute -right-6 -bottom-6 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+              </div>
+
+              {/* OPTION 1: 1-CLICK BATCH AUTO-TRAIN ALL ITEMS */}
+              <div className="p-5 bg-linear-to-br from-indigo-50/80 via-white to-purple-50/60 border-2 border-indigo-200 rounded-2xl shadow-xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md">
+                      <Rocket className="w-5 h-5 text-amber-300" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-slate-900 text-sm">
+                          Opsi 1: Latih Otomatis Seluruh Barang di Database (1-Klik)
+                        </h4>
+                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 font-extrabold text-[10px] rounded-full border border-indigo-200">
+                          Paling Direkomendasikan
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        Membuat 4 variasi cerdas (singkatan gudang, format kode + rak, percakapan suara, dan catatan kondisi) untuk setiap barang.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-[10px] text-slate-500 uppercase font-bold">Katalog Barang Aktif</div>
+                    <div className="text-base font-extrabold text-indigo-900 font-mono">
+                      {items.length} Barang Master
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border border-indigo-100 rounded-xl text-xs text-slate-700 space-y-1.5">
+                  <div className="font-semibold text-indigo-950 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Yang akan otomatis dipelajari oleh model:</span>
+                  </div>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 pl-5 list-disc">
+                    <li>Singkatan informal & slang (misal: <em>brg 6204, lmp 50w, kbl nym</em>)</li>
+                    <li>Penyebutan kode barang & nomor rak lokasi penyimpanan</li>
+                    <li>Bahasa lisan/suara (<em>"tolong catat ... dapat sekian di rak ..."</em>)</li>
+                    <li>Catatan kondisi barang (<em>segel utuh, kardus basah, retak</em>)</li>
+                  </ul>
+                </div>
+
+                {batchTrainSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl text-xs flex items-center justify-between gap-3 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <div>
+                        <strong>Sukses!</strong> {batchTrainSuccess.total} variasi pola berhasil dilatihkan untuk {batchTrainSuccess.count} barang.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('test');
+                        setTestInput(`${items[0]?.namaStok.split(' ')[0].toLowerCase()} 10`);
+                      }}
+                      className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg text-xs transition-colors shrink-0 flex items-center gap-1 shadow-2xs"
+                    >
+                      <span>Coba Uji Sekarang</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    disabled={isBatchTraining || items.length === 0}
+                    onClick={handleBatchTrainAll}
+                    className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 text-xs"
+                  >
+                    {isBatchTraining ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                        <span>Sedang Melatih Model untuk {items.length} Barang...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 text-amber-300" />
+                        <span>Latih Semua {items.length} Barang Sekarang (~{items.length * 4} Pola Baru)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* OPTION 2: CURATED INDUSTRY PRESETS */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Package className="w-4 h-4 text-indigo-600" />
+                      <span>Opsi 2: Pasang Paket Data Latih Industri Siap Pakai (Preset Curated)</span>
+                    </h4>
+                    <p className="text-xs text-slate-600">
+                      Pilih bidang gudang Anda untuk menambahkan kumpulan contoh kalimat & kamus singkatan secara instan:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {presets.map(preset => {
+                    const isLoaded = loadedPresetId === preset.id;
+                    return (
+                      <div
+                        key={preset.id}
+                        className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
+                          isLoaded
+                            ? 'bg-emerald-50/70 border-emerald-300 shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-xs'
+                        }`}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                              {preset.name}
+                            </span>
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 rounded-md">
+                              {preset.sampleCount} Pola Latih
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">
+                            {preset.description}
+                          </p>
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {preset.highlightTokens.map((token, tIdx) => (
+                              <span
+                                key={tIdx}
+                                className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-mono font-medium"
+                              >
+                                {token}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            +{Object.keys(preset.aliases).length} Kamus Singkatan
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleLoadPreset(preset.id)}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 transition-all ${
+                              isLoaded
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200'
+                            }`}
+                          >
+                            {isLoaded ? (
+                              <>
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Telah Terpasang</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Muat & Latih Paket Ini</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* OPTION 3: GUIDED INTERACTIVE TRAINER PER ITEM */}
+              <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                      <Cpu className="w-4 h-4 text-purple-600" />
+                      <span>Opsi 3: Latihan Terpandu per Barang (Pilih & Latih Variasi Rekomendasi)</span>
+                    </h4>
+                    <p className="text-xs text-slate-600">
+                      Pilih barang spesifik di bawah untuk melihat variasi pola yang direkomendasikan sistem, lalu latih model dengan 1 klik:
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Pilih Barang yang Ingin Dilatihkan:
+                    </label>
+                    <select
+                      value={assistantSelectedItemCode}
+                      onChange={e => setAssistantSelectedItemCode(e.target.value)}
+                      className="w-full px-3.5 py-2.5 text-xs border border-slate-300 focus:border-indigo-600 rounded-xl outline-hidden bg-white font-medium shadow-2xs"
+                    >
+                      {items.map(item => (
+                        <option key={item.kodeStok} value={item.kodeStok}>
+                          [{item.kodeStok}] {item.namaStok} ({item.namaTempat || 'Rak Utama'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-end">
+                    {assistantSelectedItem && (
+                      <button
+                        type="button"
+                        onClick={() => handleTrainAllVariationsForItem(assistantSelectedItem, currentVariations)}
+                        className="w-full px-4 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl transition-all shadow-xs text-xs flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Latih 4 Variasi Sekaligus</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Variations Cards */}
+                {assistantSelectedItem && (
+                  <div className="space-y-2 pt-1">
+                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Rekomendasi Pola untuk "{assistantSelectedItem.namaStok}":
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {currentVariations.map((v, vIdx) => (
+                        <div
+                          key={vIdx}
+                          className="p-3 bg-white border border-slate-200 rounded-xl flex items-start justify-between gap-3 shadow-2xs"
+                        >
+                          <div className="space-y-1">
+                            <span className="inline-block px-2 py-0.5 text-[9px] font-bold rounded-md bg-slate-100 text-slate-700">
+                              {v.label}
+                            </span>
+                            <div className="text-xs font-medium text-slate-900 font-mono">
+                              "{v.phrase}"
+                            </div>
+                            <div className="text-[10px] text-slate-500">
+                              Target Qty: <strong>{v.suggestedQty}</strong> • Lokasi: <strong>{v.suggestedLokasi}</strong>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleTrainSingleVariation(v, assistantSelectedItem)}
+                            title="Latih pola ini saja"
+                            className="p-1.5 bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white rounded-lg transition-colors border border-indigo-200 shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
 
           {/* TAB 1: TEST / SANDBOX */}
           {activeTab === 'test' && (
@@ -512,7 +905,7 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: TRAIN MODEL (AJARI MESIN) */}
+          {/* TAB 2: TRAIN MODEL MANUAL */}
           {activeTab === 'train' && (
             <div className="space-y-5">
               <div className="p-4 bg-linear-to-r from-indigo-50 to-emerald-50 border border-indigo-100 rounded-2xl">
@@ -705,10 +1098,10 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
                             <span
                               className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase ${
                                 sample.source === 'auto_learned'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : sample.source === 'manual_training'
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-slate-100 text-slate-600'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : sample.source === 'manual_training'
+                                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                    : 'bg-slate-100 text-slate-600'
                               }`}
                             >
                               {sample.source === 'auto_learned'
@@ -812,8 +1205,9 @@ export const CustomMlStudioModal: React.FC<CustomMlStudioModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-          <div className="text-slate-500">
-            Model berjalan di mesin Anda (client-side & server TS). Bebas kuota & privasi aman.
+          <div className="text-slate-500 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Model berjalan di mesin Anda (client-side TS). Bebas kuota & privasi 100% aman.</span>
           </div>
           <button
             type="button"
