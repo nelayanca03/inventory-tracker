@@ -19,7 +19,7 @@ import {
   Download,
   Copy,
   RotateCcw,
-  Sparkles
+  BrainCircuit
 } from 'lucide-react';
 import { InventoryItem, FilterState, ViewMode } from '../types/inventory';
 import { exportInventoryToCsv, copyInventoryToClipboardTSV } from '../services/csvService';
@@ -32,7 +32,7 @@ interface InventoryListProps {
   onQuickUpdateQty: (id: string, newQtyFisik: number) => void;
   onResetAllQtyFisik?: () => void;
   onOpenPhotoLightbox: (item: InventoryItem) => void;
-  onOpenAiAudit?: () => void;
+  onOpenMlStudio?: () => void;
 }
 
 /**
@@ -145,7 +145,7 @@ export const InventoryList: React.FC<InventoryListProps> = ({
   onQuickUpdateQty,
   onResetAllQtyFisik,
   onOpenPhotoLightbox,
-  onOpenAiAudit
+  onOpenMlStudio
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [copied, setCopied] = useState(false);
@@ -380,16 +380,16 @@ export const InventoryList: React.FC<InventoryListProps> = ({
               </button>
             </div>
 
-            {/* Analisis Audit AI Button */}
-            {onOpenAiAudit && (
+            {/* Studio Machine Learning Button */}
+            {onOpenMlStudio && (
               <button
                 type="button"
-                onClick={onOpenAiAudit}
-                className="px-3 py-2 bg-linear-to-r from-indigo-600 to-slate-900 hover:from-indigo-500 hover:to-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 border border-indigo-400/40"
-                title="Buka Analisis Audit & Anomali AI"
+                onClick={onOpenMlStudio}
+                className="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-xl transition-all shadow-2xs flex items-center gap-1.5 active:scale-95"
+                title="Buka Studio Machine Learning (Latih Model & Uji Coba Input)"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                <span>Analisis Audit AI</span>
+                <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Studio ML</span>
               </button>
             )}
 

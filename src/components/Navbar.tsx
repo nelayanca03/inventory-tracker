@@ -22,7 +22,6 @@ interface NavbarProps {
   items: InventoryItem[];
   onLogout: () => void;
   onOpenStorageModal?: () => void;
-  onOpenAiAssistant?: () => void;
   onOpenMlStudio?: () => void;
 }
 
@@ -33,7 +32,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   items,
   onLogout,
   onOpenStorageModal,
-  onOpenAiAssistant,
   onOpenMlStudio
 }) => {
   const isAdmin = currentUser.role === 'admin';
@@ -157,23 +155,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenMlStudio}
                 title="Buka Studio Machine Learning (Latih Model & Uji Coba Input)"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/80 border border-indigo-200 rounded-xl transition-all shadow-2xs active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all shadow-2xs active:scale-95"
               >
                 <BrainCircuit className="w-3.5 h-3.5 text-indigo-600" />
-                <span className="hidden md:inline">Studio ML</span>
-              </button>
-            )}
-
-            {/* Asisten AI Button */}
-            {onOpenAiAssistant && (
-              <button
-                type="button"
-                onClick={onOpenAiAssistant}
-                title="Buka Asisten InvenTrack AI"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-linear-to-r from-indigo-600 via-indigo-700 to-slate-900 hover:from-indigo-500 hover:to-slate-800 rounded-xl shadow-xs transition-all active:scale-95 border border-indigo-400/40"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
-                <span className="hidden sm:inline">Asisten AI</span>
+                <span className="hidden sm:inline">Studio ML</span>
               </button>
             )}
 

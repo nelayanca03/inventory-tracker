@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -15,6 +16,79 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Ensure assets/images directory exists and is statically served
+const imagesDir = path.resolve(__dirname, 'src/assets/images');
+if (!fs.existsSync(imagesDir)) {
+  fs.mkdirSync(imagesDir, { recursive: true });
+}
+app.use('/assets/images', express.static(imagesDir));
+app.use('/src/assets/images', express.static(imagesDir));
+
+// Endpoint: Upload attached image to assets/images and return web URL
+app.post('/api/upload-image', (req: Request, res: Response) => {
+  try {
+    const { imageBase64, filename, kodeStok } = req.body;
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
+      res.status(400).json({ error: 'Data base64 gambar diperlukan' });
+      return;
+    }
+
+    const matches = imageBase64.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+    let ext = 'jpg';
+    let rawBase64 = imageBase64;
+    if (matches && matches.length === 3) {
+      ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+      rawBase64 = matches[2];
+    } else {
+      rawBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    }
+
+    const buffer = Buffer.from(rawBase64, 'base64');
+    const safeKode = (kodeStok || 'item').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = filename 
+      ? filename.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
+      : `${safeKode}_${Date.now()}.${ext}`;
+
+    const finalFilename = safeName.endsWith(`.${ext}`) ? safeName : `${safeName}.${ext}`;
+    const targetPath = path.join(imagesDir, finalFilename);
+
+    fs.writeFileSync(targetPath, buffer);
+
+    const publicUrl = `/assets/images/${finalFilename}`;
+    res.json({
+      success: true,
+      url: publicUrl,
+      filename: finalFilename,
+      bytes: buffer.length,
+    });
+  } catch (err: any) {
+    console.error('Error in /api/upload-image:', err);
+    res.status(500).json({ error: err.message || 'Gagal menyimpan foto ke folder assets/images' });
+  }
+});
+
+// Endpoint: Delete image file from assets/images
+app.post('/api/delete-image', (req: Request, res: Response) => {
+  try {
+    const { url, filename } = req.body;
+    const targetFilename = filename || (url ? path.basename(url) : null);
+    if (!targetFilename) {
+      res.status(400).json({ error: 'Nama file gambar tidak valid' });
+      return;
+    }
+
+    const safeFile = path.basename(targetFilename);
+    const targetPath = path.join(imagesDir, safeFile);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+    res.json({ success: true, message: `Foto ${safeFile} berhasil dihapus dari folder assets/images` });
+  } catch (err: any) {
+    console.error('Error in /api/delete-image:', err);
+    res.status(500).json({ error: err.message || 'Gagal menghapus file foto' });
+  }
+});
 
 // Initialize Google Gemini SDK on the server
 const apiKey = process.env.GEMINI_API_KEY || '';

@@ -222,15 +222,15 @@ export const UserSimpleCountView: React.FC<UserSimpleCountViewProps> = ({
             )}
           </div>
 
-          {/* AI Smart Input Quick Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-linear-to-r from-emerald-50 via-teal-50 to-indigo-50 border border-emerald-200/80 rounded-2xl">
+          {/* Machine Learning & Smart Input Quick Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-linear-to-r from-indigo-50 via-teal-50 to-emerald-50 border border-indigo-200/80 rounded-2xl">
             <div className="flex items-center gap-2 pl-1">
-              <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
-                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-2xs">
+                <BrainCircuit className="w-4 h-4 text-amber-300 animate-pulse" />
               </div>
               <div className="text-xs">
-                <span className="font-bold text-slate-900 block leading-tight">AI Smart Input & Scan Foto</span>
-                <span className="text-[11px] text-slate-500">Hitung lebih cepat lewat suara, kalimat bebas, atau foto barang</span>
+                <span className="font-bold text-slate-900 block leading-tight">Studio Machine Learning & Input Pintar</span>
+                <span className="text-[11px] text-slate-500">Mengenali singkatan, suara, dan foto barang otomatis via Model ML Mandiri</span>
               </div>
             </div>
             <div className="flex items-center gap-1.5 w-full sm:w-auto">

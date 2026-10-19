@@ -54,6 +54,7 @@ import { AdminUserVerification } from './AdminUserVerification';
 import { BulkItemSettingsModal } from './BulkItemSettingsModal';
 import { CatalogBatchPhotoModal } from './CatalogBatchPhotoModal';
 import { getAllUsers } from '../services/authService';
+import { uploadImageToAssets, deleteImageFromAssets } from '../services/imageService';
 
 interface AdminMasterManagementProps {
   currentAdmin: UserAccount;
@@ -293,16 +294,45 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
     }
   };
 
-  const handleSaveQuickPhoto = () => {
+  const handleSaveQuickPhoto = async () => {
     if (!quickPhotoItem) return;
+    setIsCompressing(true);
+    try {
+      let finalUrl = quickPhotoPreview;
+      if (finalUrl && finalUrl.startsWith('data:image/')) {
+        finalUrl = await uploadImageToAssets(finalUrl, quickPhotoItem.kodeStok);
+      }
+      const updated: InventoryItem = {
+        ...quickPhotoItem,
+        gambarUrl: finalUrl,
+        updatedAt: new Date().toISOString()
+      };
+      onSaveItem(updated);
+      showNotice(`Foto master "${updated.namaStok}" berhasil disimpan ke database dan folder assets/images!`);
+      setQuickPhotoItem(null);
+    } catch (err) {
+      console.error('Failed to save quick photo:', err);
+      showNotice('Gagal menyimpan foto. Silakan coba lagi.');
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
+  const handleDeletePhotoPermanently = async (item: InventoryItem) => {
+    if (item.gambarUrl && item.gambarUrl.startsWith('/assets/images/')) {
+      await deleteImageFromAssets(item.gambarUrl);
+    }
     const updated: InventoryItem = {
-      ...quickPhotoItem,
-      gambarUrl: quickPhotoPreview,
+      ...item,
+      gambarUrl: '',
       updatedAt: new Date().toISOString()
     };
     onSaveItem(updated);
-    showNotice(`Foto master untuk "${updated.namaStok}" berhasil disimpan!`);
-    setQuickPhotoItem(null);
+    if (quickPhotoItem?.id === item.id) {
+      setQuickPhotoPreview('');
+      setQuickPhotoItem(null);
+    }
+    showNotice(`Foto master "${item.namaStok}" berhasil dihapus dari database.`);
   };
 
   const handleOpenAddForm = () => {
@@ -344,7 +374,10 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
     try {
       setIsCompressing(true);
       const compressedDataUrl = await compressImageFile(file, 1200, 1200, 0.8);
-      setGambarUrl(compressedDataUrl);
+      // Immediately upload to assets/images
+      const savedAssetUrl = await uploadImageToAssets(compressedDataUrl, kodeStok || 'master');
+      setGambarUrl(savedAssetUrl);
+      showNotice('Foto berhasil dimuat dan disimpan ke assets/images!');
     } catch (err) {
       console.error('Failed to compress image:', err);
       setFormError('Gagal memproses gambar foto master.');
@@ -354,7 +387,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
     }
   };
 
-  const handleSubmitMasterItem = (e: React.FormEvent) => {
+  const handleSubmitMasterItem = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -365,6 +398,18 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
     if (!namaStok.trim()) {
       setFormError('Nama Barang (Product Name) wajib diisi.');
       return;
+    }
+
+    let finalGambarUrl = gambarUrl;
+    if (finalGambarUrl && finalGambarUrl.startsWith('data:image/')) {
+      setIsCompressing(true);
+      try {
+        finalGambarUrl = await uploadImageToAssets(finalGambarUrl, kodeStok.trim());
+      } catch (err) {
+        console.warn('Failed to upload image to assets, using base64:', err);
+      } finally {
+        setIsCompressing(false);
+      }
     }
 
     const newItem: InventoryItem = {
@@ -381,7 +426,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
       opnameValue: Number(opnameValue) || 0,
       satuan,
       kondisi: editingItem ? editingItem.kondisi : 'Baik',
-      gambarUrl,
+      gambarUrl: finalGambarUrl,
       petugas: editingItem ? editingItem.petugas : currentAdmin.fullName,
       catatan: catatan.trim(),
       createdAt: editingItem?.createdAt || new Date().toISOString(),
@@ -1092,14 +1137,14 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                             {item.no || idx + 1}
                           </td>
 
-                          {/* Photo Thumbnail / Quick Upload */}
-                          <td className="px-4 py-3 text-center">
+                          {/* Photo Thumbnail / Quick Upload & Delete */}
+                          <td className="px-3 py-3 text-center">
                             {item.gambarUrl ? (
-                              <div className="relative group inline-block">
+                              <div className="flex flex-col items-center gap-1.5 min-w-[70px]">
                                 <button
                                   type="button"
                                   onClick={() => onOpenPhotoLightbox(item)}
-                                  className="w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 block hover:ring-2 hover:ring-slate-900 transition-all shadow-xs"
+                                  className="w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 block hover:ring-2 hover:ring-slate-900 transition-all shadow-xs group relative"
                                   title="Klik untuk zoom foto"
                                 >
                                   <img
@@ -1108,21 +1153,34 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                                     referrerPolicy="no-referrer"
                                     className="w-full h-full object-cover"
                                   />
+                                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </div>
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setQuickPhotoItem(item);
-                                    setQuickPhotoPreview(item.gambarUrl || '');
-                                    setPhotoHelperNotice(null);
-                                    setInputUrlQuickPhoto('');
-                                    setIsQuickPhotoPresetsOpen(false);
-                                  }}
-                                  className="absolute -top-1 -right-1 p-1 bg-slate-900 hover:bg-indigo-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
-                                  title="Ganti / atur foto master"
-                                >
-                                  <Camera className="w-2.5 h-2.5" />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setQuickPhotoItem(item);
+                                      setQuickPhotoPreview(item.gambarUrl || '');
+                                      setPhotoHelperNotice(null);
+                                      setInputUrlQuickPhoto('');
+                                      setIsQuickPhotoPresetsOpen(false);
+                                    }}
+                                    className="px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-200 transition-colors shadow-2xs"
+                                    title="Ganti foto baru"
+                                  >
+                                    Ganti
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeletePhotoPermanently(item)}
+                                    className="px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-md border border-rose-200 transition-colors shadow-2xs"
+                                    title="Hapus foto dari barang ini"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
                               </div>
                             ) : (
                               <button
@@ -1135,7 +1193,7 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                                   setIsQuickPhotoPresetsOpen(false);
                                 }}
                                 className="w-12 h-12 rounded-lg border-2 border-dashed border-amber-300 hover:border-slate-900 bg-amber-50/50 hover:bg-slate-100 flex flex-col items-center justify-center text-amber-700 hover:text-slate-900 mx-auto transition-colors"
-                                title="Klik untuk tambah foto (bisa Paste Ctrl+V, Cari di Google, URL, Preset, dll)"
+                                title="Klik untuk tambah foto (Upload, Kamera, Paste Ctrl+V, URL, dll)"
                               >
                                 <Camera className="w-4 h-4" />
                                 <span className="text-[9px] font-bold mt-0.5">+ Foto</span>
@@ -1977,23 +2035,41 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
                   />
 
                   {gambarUrl ? (
-                    <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-100 min-h-[220px] flex items-center justify-center p-2">
-                      <img
-                        src={gambarUrl}
-                        alt="Foto Master"
-                        referrerPolicy="no-referrer"
-                        className="max-h-52 max-w-full object-contain rounded-lg shadow-xs"
-                      />
-                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setGambarUrl('')}
-                          className="p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors shadow-md flex items-center gap-1 text-[11px] font-bold px-2.5"
-                          title="Hapus foto ini"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Hapus Foto</span>
-                        </button>
+                    <div className="space-y-2">
+                      <div className="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-100 min-h-[200px] flex items-center justify-center p-3">
+                        <img
+                          src={gambarUrl}
+                          alt="Foto Master"
+                          referrerPolicy="no-referrer"
+                          className="max-h-52 max-w-full object-contain rounded-lg shadow-xs"
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl">
+                        <span className="text-[11px] font-semibold text-slate-700">Foto master terpasang</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>Ganti Foto Baru</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (gambarUrl.startsWith('/assets/images/')) {
+                                await deleteImageFromAssets(gambarUrl);
+                              }
+                              setGambarUrl('');
+                              showNotice('Foto berhasil dihapus dari form.');
+                            }}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Hapus Foto</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -2254,31 +2330,43 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
             {/* Image Preview Box */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[200px] flex items-center justify-center p-3 relative">
               {quickPhotoPreview ? (
-                <div className="relative w-full h-48 flex items-center justify-center">
-                  <img
-                    src={quickPhotoPreview}
-                    alt="Preview"
-                    referrerPolicy="no-referrer"
-                    className="max-h-48 max-w-full object-contain rounded-lg shadow-xs"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickPhotoPreview('');
-                      setPhotoHelperNotice(null);
-                    }}
-                    className="absolute top-2 right-2 p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-md"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Hapus</span>
-                  </button>
+                <div className="relative w-full flex flex-col items-center gap-3">
+                  <div className="h-44 w-full flex items-center justify-center bg-slate-100 rounded-xl p-2">
+                    <img
+                      src={quickPhotoPreview}
+                      alt="Preview"
+                      referrerPolicy="no-referrer"
+                      className="max-h-40 max-w-full object-contain rounded-lg shadow-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => quickFileInputRef.current?.click()}
+                      className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Ganti Foto Baru</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickPhotoPreview('');
+                        setPhotoHelperNotice('Foto dikosongkan. Klik "Simpan Foto Master" atau "Hapus Foto Permanen" di bawah.');
+                      }}
+                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Kosongkan / Hapus</span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center p-4">
                   <ImageIcon className="w-10 h-10 text-slate-300 mx-auto" />
                   <span className="text-xs font-bold text-slate-700 block mt-1">Belum Ada Foto Master</span>
                   <span className="text-[11px] text-slate-400 block mt-0.5">
-                    Gunakan salah satu opsi cepat di bawah untuk menambahkan gambar dengan mudah.
+                    Gunakan salah satu opsi cepat di bawah untuk menambahkan atau mengganti gambar.
                   </span>
                 </div>
               )}
@@ -2408,23 +2496,38 @@ export const AdminMasterManagement: React.FC<AdminMasterManagementProps> = ({
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setQuickPhotoItem(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                disabled={isCompressing}
-                onClick={handleSaveQuickPhoto}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-              >
-                <Save className="w-4 h-4 text-emerald-400" />
-                <span>Simpan Foto Master</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-100">
+              {quickPhotoItem && (quickPhotoItem.gambarUrl || quickPhotoPreview) ? (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePhotoPermanently(quickPhotoItem)}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs"
+                  title="Hapus foto dari barang ini secara permanen"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Foto Permanen</span>
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setQuickPhotoItem(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isCompressing || !quickPhotoPreview}
+                  onClick={handleSaveQuickPhoto}
+                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4 text-emerald-400" />
+                  <span>Simpan Foto Master</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

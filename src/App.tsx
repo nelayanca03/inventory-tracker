@@ -7,7 +7,6 @@ import { InventoryList } from './components/InventoryList';
 import { ActivityLogView } from './components/ActivityLogView';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { FirebaseStorageModal } from './components/FirebaseStorageModal';
-import { AIAssistantDrawer } from './components/AIAssistantDrawer';
 import { CustomMlStudioModal } from './components/CustomMlStudioModal';
 import { InventoryItem, AppSettings, UserAccount, InputLog } from './types/inventory';
 import { 
@@ -30,7 +29,7 @@ import {
   clearCloudLogs
 } from './services/firebase';
 import { getCurrentSession, logoutUser, getAllUsers } from './services/authService';
-import { CheckCircle2, Cloud, Database, Sparkles } from 'lucide-react';
+import { CheckCircle2, Cloud, Database } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(getCurrentSession());
@@ -42,7 +41,6 @@ export default function App() {
   const [lightboxItem, setLightboxItem] = useState<InventoryItem | null>(null);
   const [editingMasterItem, setEditingMasterItem] = useState<InventoryItem | null>(null);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState(false);
-  const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
   const [isMlStudioOpen, setIsMlStudioOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
@@ -357,7 +355,6 @@ export default function App() {
         items={items} 
         onLogout={handleLogout}
         onOpenStorageModal={() => setIsStorageModalOpen(true)}
-        onOpenAiAssistant={() => setIsAiDrawerOpen(true)}
         onOpenMlStudio={() => setIsMlStudioOpen(true)}
       />
 
@@ -430,6 +427,7 @@ export default function App() {
                   settings={settings}
                   onSaveCount={handleSaveItem}
                   onOpenPhotoLightbox={(item) => setLightboxItem(item)}
+                  onOpenMlStudio={() => setIsMlStudioOpen(true)}
                 />
               </div>
             )}
@@ -450,7 +448,7 @@ export default function App() {
                 onQuickUpdateQty={handleQuickUpdateQty}
                 onResetAllQtyFisik={handleResetAllQtyFisik}
                 onOpenPhotoLightbox={(item) => setLightboxItem(item)}
-                onOpenAiAudit={() => setIsAiDrawerOpen(true)}
+                onOpenMlStudio={() => setIsMlStudioOpen(true)}
               />
             )}
 
@@ -482,29 +480,6 @@ export default function App() {
         users={getAllUsers()}
         settings={settings}
         onClearLogs={handleClearLogs}
-      />
-
-      {/* Floating AI Assistant Trigger Button */}
-      <button
-        type="button"
-        onClick={() => setIsAiDrawerOpen(true)}
-        title="Buka Asisten InvenTrack AI"
-        className="fixed bottom-6 right-6 z-40 bg-linear-to-r from-indigo-600 via-indigo-700 to-slate-900 text-white p-3.5 sm:px-4 sm:py-3 rounded-2xl shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 border border-indigo-400/40 cursor-pointer group"
-      >
-        <div className="relative">
-          <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
-        </div>
-        <span className="hidden sm:inline font-bold text-xs tracking-tight">
-          Tanya InvenTrack AI
-        </span>
-      </button>
-
-      {/* AI Assistant Drawer */}
-      <AIAssistantDrawer
-        isOpen={isAiDrawerOpen}
-        onClose={() => setIsAiDrawerOpen(false)}
-        items={items}
       />
 
       {/* Custom Machine Learning Studio Modal */}
